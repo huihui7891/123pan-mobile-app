@@ -29,6 +29,7 @@ import android.webkit.MimeTypeMap;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
@@ -129,12 +130,22 @@ public class MainActivity extends Activity {
     }
 
     // ---- 屏幕常亮 ----
+    private android.os.PowerManager.WakeLock wakeLock;
     public void setKeepScreenOn(boolean on) {
-        if (on) {
-            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        } else {
-            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
+        runOnUiThread(() -> {
+            if (on) {
+                getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (wakeLock == null) {
+                    android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                    wakeLock = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "pan:keep");
+                    wakeLock.setReferenceCounted(false);
+                }
+                if (!wakeLock.isHeld()) wakeLock.acquire();
+            } else {
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+            }
+        });
     }
 
     // ---- 自定义下载目录 ----
@@ -234,6 +245,34 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
+                // 拦截 thumb://fileId=xxx 返回 123pan 缩略图
+                if (url != null && url.startsWith("thumb://")) {
+                    try {
+                        String fid = url.substring("thumb://fileId=".length());
+                        String token = prefs.getString(KEY_TOKEN, "");
+                        java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                            new java.net.URL("https://www.123pan.cn/api/file/thumbnail?fileId=" + fid).openConnection();
+                        c.setConnectTimeout(8000);
+                        c.setReadTimeout(8000);
+                        c.setRequestProperty("authorization", "Bearer " + token);
+                        c.setRequestProperty("platform", "web");
+                        c.setRequestProperty("user-agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36");
+                        int code = c.getResponseCode();
+                        if (code == 200) {
+                            java.io.InputStream is = c.getInputStream();
+                            WebResourceResponse resp = new WebResourceResponse("image/jpeg", "UTF-8", is);
+                            return resp;
+                        }
+                    } catch (Exception e) {
+                        Log.e("PAN", "thumb intercept fail: " + url, e);
+                    }
+                    return new WebResourceResponse("text/plain", "UTF-8", new java.io.ByteArrayInputStream(new byte[0]));
+                }
+                return super.shouldInterceptRequest(view, url);
+            }
+
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);

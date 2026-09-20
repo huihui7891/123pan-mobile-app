@@ -311,14 +311,7 @@
     if (v === 'recycle') loadRecycle();
     if (v === 'transfers') { renderTransfers(); startProgressPolling(); }
     else { stopProgressPolling(); }
-    if (v === 'files') {
-      // 从相册模式切回文件页：重置相册模式并重新加载文件列表
-      if (state.galleryMode) { state.galleryMode = false; loadList(); }
-      else if (!$('file-list').dataset.loaded) loadList();
-    } else {
-      // 切到其他页时退出相册模式
-      state.galleryMode = false;
-    }
+    if (v === 'files' && !$('file-list').dataset.loaded) loadList();
     // 恢复文件列表滚动位置
     var sc2 = $('content');
     if (sc2 && state.filesScrollTop) {
@@ -536,112 +529,6 @@
         if (state.view === 'transfers') renderTransfers();
       }
     } catch (e) { /* 忽略轮询解析错误 */ }
-  }
-  // 相册模式：BFS 递归遍历目录，收集图片/视频
-  var GALLERY_EXT = ['jpg','jpeg','png','gif','webp','bmp','heic','mp4','mov','avi','mkv','webm','m4v'];
-  function isGalleryFile(name) {
-    if (!name) return false;
-    var ext = name.split('.').pop().toLowerCase();
-    return GALLERY_EXT.indexOf(ext) >= 0;
-  }
-  function loadGallery() {
-    var box = $('file-list');
-    if (!box) return;
-    box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>正在扫描网盘...</p><p class="panel-sub" id="gallery-progress">0 个目录已扫描</p></div>';
-    var found = [];
-    var queue = [0];
-    var visited = {};
-    var inFlight = 0;
-    var scanned = 0;
-    var CONCURRENCY = 6;
-    function pump() {
-      while (inFlight < CONCURRENCY && queue.length) {
-        var pid = queue.shift();
-        if (visited[pid]) continue;
-        visited[pid] = true;
-        inFlight++;
-        (function (pid) {
-          api('GET', API.list + '?driveId=0&limit=200&next=0&orderBy=file_id&orderDirection=desc&parentFileId=' + pid + '&trashed=false&SearchData=&Page=1&OnlyLookAbnormalFile=0', '', true, function (d) {
-            inFlight--;
-            // 已退出相册模式，停止后续渲染
-            if (!state.galleryMode) { queue.length = 0; return; }
-            scanned++;
-            var pg = $('gallery-progress');
-            if (pg) pg.textContent = scanned + ' 个目录已扫描，找到 ' + found.length + ' 个图片/视频';
-            if (!d || d.code !== 0) { pump(); return; }
-            var list = (d.data && (d.data.InfoList || d.data.infoList)) || [];
-            for (var i = 0; i < list.length; i++) {
-              var f = list[i];
-              if (f.Type === 1) { queue.push(f.FileId); }
-              else if (isGalleryFile(f.FileName)) { found.push(f); }
-            }
-            // 增量渲染
-            if (found.length) renderGalleryGrid(found);
-            pump();
-          });
-        })(pid);
-      }
-      if (inFlight === 0 && !queue.length) {
-        if (!found.length) {
-          box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>相册为空</p><p class="panel-sub">未找到图片/视频</p></div>';
-        } else {
-          renderGalleryGrid(found);
-        }
-      }
-    }
-    pump();
-  }
-  function renderGalleryGrid(files) {
-    var box = $('file-list');
-    if (!box) return;
-    if (!files.length) {
-      box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>相册为空</p><p class="panel-sub">未找到图片/视频</p></div>';
-      return;
-    }
-    var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px;">';
-    for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      var isVideo = /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(f.FileName || '');
-      var nm = (f.FileName || '未命名');
-      var shortNm = nm.length > 14 ? nm.slice(0, 13) + '…' : nm;
-      html += '<div style="aspect-ratio:1;background:var(--divider,#eee);border-radius:8px;overflow:hidden;position:relative;cursor:pointer;" data-gi="' + i + '" data-fid="' + (f.FileId||'') + '">'
-        + '<img data-thumb="' + i + '" src="" style="width:100%;height:100%;object-fit:cover;display:none;" />'
-        + '<div class="ph" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:14px;color:var(--fg3,#999);padding:4px;box-sizing:border-box;">'
-        + '<div style="font-size:28px;">' + (isVideo ? '🎬' : '🖼️') + '</div>'
-        + '<div style="font-size:10px;text-align:center;line-height:1.2;word-break:break-all;">' + shortNm + '</div>'
-        + '</div>'
-        + (isVideo ? '<div style="position:absolute;top:4px;right:4px;font-size:16px;text-shadow:0 1px 3px rgba(0,0,0,0.5);">▶️</div>' : '')
-        + '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.7));color:#fff;font-size:10px;padding:14px 4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + shortNm + '</div>'
-        + '</div>';
-    }
-    html += '</div>';
-    box.innerHTML = html;
-    // 点击缩略图预览
-    box.querySelectorAll('[data-gi]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var f = files[parseInt(el.getAttribute('data-gi'))];
-        openPreview(f);
-      });
-    });
-    // 加载缩略图
-    box.querySelectorAll('[data-thumb]').forEach(function (img) {
-      var i = parseInt(img.getAttribute('data-thumb'));
-      var f = files[i];
-      if (!f || !f.FileId) return;
-      var cb = '_thumb_' + Date.now() + '_' + i;
-      window[cb] = function (b64) {
-        try {
-          if (b64 && b64.length > 100) {
-            img.src = 'data:image/jpeg;base64,' + b64;
-            img.style.display = 'block';
-            var ph = img.parentElement.querySelector('.ph');
-            if (ph) ph.style.display = 'none';
-          }
-        } catch (e) {}
-        try { delete window[cb]; } catch (e) {}
-      };
-      bridge.getThumbnail(cb, Number(f.FileId));
-    });
   }
 
   // 离线下载：先解析资源，再提交
@@ -3945,13 +3832,6 @@
     });
     $('newfolder-ok').addEventListener('click', doNewFolder);
     $('newfolder-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') doNewFolder(); });
-    // 相册模式：递归加载全盘图片/视频网格
-    var galleryBtn = $('tool-gallery');
-    if (galleryBtn) galleryBtn.addEventListener('click', function () {
-      if (state.galleryMode) { state.galleryMode = false; loadList(); return; }
-      state.galleryMode = true;
-      loadGallery();
-    });
     // 上传
     // 上传：弹出方式选择（文件 / 文件夹）；文件由原生接管，文件夹走 SAF 目录树
     $('tool-upload').addEventListener('click', doUpload);
