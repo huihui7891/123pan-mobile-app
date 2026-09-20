@@ -3287,22 +3287,56 @@
   }
   function bindProfileEvents() {
     $('profile-back').addEventListener('click', function () { hide($('profile-page')); });
+    // 发送短信验证码
+    var smsBtn = $('pf-send-sms');
+    var countdown = 0;
+    var timer = null;
+    function tickSms() {
+      if (countdown <= 0) {
+        smsBtn.disabled = false;
+        smsBtn.textContent = '获取验证码';
+        if (timer) { clearInterval(timer); timer = null; }
+        return;
+      }
+      smsBtn.textContent = countdown + 's 后重发';
+      countdown--;
+    }
+    smsBtn.addEventListener('click', function () {
+      if (countdown > 0) return;
+      var oldp = $('pf-old-pwd').value;
+      if (!oldp) { toast('请先输入当前密码'); return; }
+      smsBtn.disabled = true;
+      api('POST', 'https://api.123pan.cn/a/api/user/send_sms_code',
+        JSON.stringify({ scene: 'change_password', password: oldp }), true, function (d) {
+          if (d && (d.code === 0 || d.Code === 0)) {
+            toast('验证码已发送');
+            countdown = 60; tickSms();
+            timer = setInterval(tickSms, 1000);
+          } else {
+            toast('发送失败：' + ((d && d.message) || '接口未开放'));
+            smsBtn.disabled = false;
+          }
+        });
+    });
     $('pf-submit').addEventListener('click', function () {
       var oldp = $('pf-old-pwd').value;
       var newp = $('pf-new-pwd').value;
       var cfmp = $('pf-confirm-pwd').value;
+      var code = $('pf-sms-code').value;
       if (!oldp) { toast('请输入当前密码'); return; }
       if (!newp || newp.length < 6) { toast('新密码至少6位'); return; }
       if (newp !== cfmp) { toast('两次输入的新密码不一致'); return; }
+      if (!code) { toast('请输入短信验证码'); return; }
       api('POST', 'https://api.123pan.cn/a/api/user/update_password',
-        JSON.stringify({ OldPassword: oldp, Password: newp }), true, function (d) {
+        JSON.stringify({ oldPassword: oldp, password: newp, checkCode: code }), true, function (d) {
           if (d && (d.code === 0 || d.Code === 0)) {
             toast('密码已修改');
             $('pf-old-pwd').value = '';
             $('pf-new-pwd').value = '';
             $('pf-confirm-pwd').value = '';
+            $('pf-sms-code').value = '';
             hide($('profile-page'));
-          } else { toast((d && d.message) || '修改失败'); }
+          } else { toast('修改失败：' + ((d && d.message) || '未知错误')); }
         });
     });
   }
