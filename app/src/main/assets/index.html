@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>123云盘</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 登录页 -->
+  <div id="page-login" class="page hidden">
+    <div class="login-wrap">
+      <div class="login-logo">123<span>云盘</span></div>
+      <button id="official-login-btn" class="btn-primary btn-lg">前往官方登录</button>
+      <div id="official-login-msg" class="login-msg"></div>
+    </div>
+  </div>
+
+  <!-- 主框架 -->
+  <div id="page-main" class="hidden">
+    <header id="topbar">
+      <span id="top-title">123云盘</span>
+      <span id="top-dup" data-icon="find-dup" title="一键查重"></span>
+      <span id="top-sort" data-icon="sort" title="排序"></span>
+    </header>
+
+    <!-- 内容区（文件 / 传输 / 我的 三个视图） -->
+    <main id="content">
+      <!-- 文件视图 -->
+      <section id="view-files" class="view">
+        <!-- 全局搜索栏 -->
+        <div id="search-bar">
+          <span class="search-icon" data-icon="search"></span>
+          <input id="search-input" type="text" placeholder="搜索全盘文件" autocomplete="off" enterkeyhint="search">
+          <span id="search-clear" class="search-clear hidden" data-icon="x-circle"></span>
+        </div>
+        <div id="breadcrumb"></div>
+        <div id="file-list"></div>
+        <!-- 底部工具栏：整理 / 上传 / 新建 -->
+        <div id="file-toolbar">
+          <div class="tool-btn" id="tool-organize" data-tool="organize">
+            <span class="tool-icon" data-icon="folder-move"></span><span>整理</span>
+          </div>
+          <div class="tool-sep"></div>
+          <div class="tool-btn" id="tool-upload" data-tool="upload">
+            <span class="tool-icon" data-icon="upload"></span><span>上传</span>
+          </div>
+          <div class="tool-sep"></div>
+          <div class="tool-btn" id="tool-newfolder" data-tool="newfolder">
+            <span class="tool-icon" data-icon="folder-plus"></span><span>新建</span>
+          </div>
+        </div>
+        <!-- 多选（整理）操作栏 -->
+        <div id="select-toolbar" class="hidden">
+          <span id="select-count">已选 0 项</span>
+          <button id="select-cancel" class="st-btn">取消</button>
+          <button id="select-delete" class="st-btn danger disabled">删除</button>
+          <button id="select-move" class="st-btn primary disabled">移动</button>
+        </div>
+      </section>
+
+      <!-- 传输视图 -->
+      <section id="view-transfers" class="view hidden">
+        <div class="transfer-tabs">
+          <button class="ttab" id="ttab-download" data-ttab="download">下载</button>
+          <button class="ttab" id="ttab-upload" data-ttab="upload">上传</button>
+        </div>
+        <div id="transfer-list"></div>
+        <div class="panel-empty" id="transfer-empty">
+          <div class="panel-icon" data-icon="transfer"></div>
+          <p id="transfer-empty-title">暂无传输任务</p>
+          <p class="panel-sub" id="transfer-empty-sub">下载文件保存在系统下载目录，上传任务在此实时显示</p>
+        </div>
+      </section>
+
+      <!-- 回收站视图 -->
+      <section id="view-recycle" class="view hidden">
+        <div class="recycle-head">
+          <span id="recycle-title">回收站</span>
+          <button id="recycle-clear" class="recycle-clear-btn">清空</button>
+        </div>
+        <div id="recycle-list"></div>
+        <div class="panel-empty" id="recycle-empty">
+          <div class="panel-icon" data-icon="trash"></div>
+          <p>回收站为空</p>
+          <p class="panel-sub">删除的文件会先进入回收站</p>
+        </div>
+      </section>
+
+      <!-- 我的视图 -->
+      <section id="view-mine" class="view hidden">
+        <div class="mine-section-title">账号管理</div>
+        <div id="account-list"></div>
+        <div class="mine-item mine-item-btn" id="account-add">
+          <span class="mine-label"><span class="mi-icon" data-icon="user-plus"></span>添加账号</span><span class="mine-val mine-arrow">›</span>
+        </div>
+        <div class="mine-item mine-item-btn" id="mine-profile"><span class="mine-label"><span class="mi-icon" data-icon="user"></span>修改密码</span><span class="mine-arrow">›</span></div>
+
+        <div class="mine-section-title">存储</div>
+        <div class="mine-item" id="mine-quota"><span class="mine-label"><span class="mi-icon" data-icon="hdd"></span>存储空间</span><span class="mine-val" id="mine-quota-val">-</span></div>
+        <div class="mine-item mine-item-btn" id="mine-download-dir"><span class="mine-label"><span class="mi-icon" data-icon="folder"></span>下载目录</span><span class="mine-val" id="mine-dir-val">Download/123云盘</span><span class="mine-arrow">›</span></div>
+        <div class="mine-item mine-item-btn" id="mine-clear-cache"><span class="mine-label"><span class="mi-icon" data-icon="broom"></span>清除缓存</span><span class="mine-val" id="mine-cache-size">0 B</span><span class="mine-arrow">›</span></div>
+
+        <div class="mine-section-title">分享</div>
+        <div class="mine-item mine-item-btn" id="mine-shares"><span class="mine-label"><span class="mi-icon" data-icon="share"></span>我的分享</span><span class="mine-arrow">›</span></div>
+        <div class="mine-item mine-item-btn" id="mine-receive"><span class="mine-label"><span class="mi-icon" data-icon="link"></span>接收分享</span><span class="mine-arrow">›</span></div>
+
+        <div class="mine-section-title">偏好设置</div>
+        <div class="mine-item mine-item-btn" id="mine-theme"><span class="mine-label"><span class="mi-icon" data-icon="sun"></span>主题模式</span><span class="mine-val" id="theme-val">跟随系统</span><span class="mine-arrow">›</span></div>
+        <div class="mine-item mine-item-btn" id="mine-keep-screen"><span class="mine-label"><span class="mi-icon" data-icon="sun"></span>屏幕常亮</span><span class="ui-switch" id="keep-switch"></span></div>
+        <div class="mine-item mine-item-btn" id="mine-autoupdate"><span class="mine-label"><span class="mi-icon" data-icon="refresh"></span>自动更新</span><span class="ui-switch" id="upd-switch"></span></div>
+
+        <button id="logout-btn" class="btn-danger">退出当前账号</button>
+      </section>
+    </main>
+
+    <!-- 底部导航 -->
+    <nav id="tabbar">
+      <div class="tab active" data-view="files"><span class="tab-icon" data-icon="folder"></span><span>文件</span></div>
+      <div class="tab" data-view="transfers"><span class="tab-icon" data-icon="transfer"></span><span>传输</span></div>
+      <div class="tab" data-view="recycle"><span class="tab-icon" data-icon="trash"></span><span>回收站</span></div>
+      <div class="tab" data-view="mine"><span class="tab-icon" data-icon="user"></span><span>我的</span></div>
+    </nav>
+  </div>
+</div>
+
+<!-- 操作菜单浮层 -->
+<div id="action-sheet" class="sheet hidden">
+  <div class="sheet-mask" data-close></div>
+  <div class="sheet-panel">
+    <div class="sheet-title" id="sheet-title"></div>
+    <div class="sheet-grid" id="sheet-grid"></div>
+    <div class="sheet-item cancel" data-close>取消</div>
+  </div>
+</div>
+
+<!-- 重命名弹窗 -->
+<div id="rename-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title">重命名</div>
+    <input id="rename-input" type="text">
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+      <button id="rename-ok" class="btn-primary">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 自定义确认弹窗（替代原生 confirm） -->
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title" id="cf-title">提示</div>
+    <div class="cf-message" id="cf-message"></div>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+      <button id="cf-ok" class="btn-primary danger">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 个人信息全屏页 -->
+<div id="profile-page" class="subpage hidden">
+  <div class="subpage-bar">
+    <span class="subpage-back" id="profile-back">‹</span>
+    <span class="subpage-title">修改密码</span>
+    <span class="subpage-spacer"></span>
+  </div>
+  <div class="profile-body" style="padding:20px 16px;">
+    <div style="margin-bottom:24px;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--accent,#2563eb);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;">🔒</div>
+      <div style="color:var(--fg2,#666);font-size:14px;">为保障账号安全，请定期更换密码</div>
+    </div>
+    <div class="card-group" style="margin-bottom:16px;">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--divider,#eee);">
+        <div style="font-size:12px;color:var(--fg3,#999);margin-bottom:6px;">当前密码</div>
+        <input type="password" id="pf-old-pwd" placeholder="请输入当前密码" style="width:100%;border:none;outline:none;font-size:16px;background:transparent;color:var(--fg,#333);padding:0;box-sizing:border-box;">
+      </div>
+      <div style="padding:14px 16px;border-bottom:1px solid var(--divider,#eee);">
+        <div style="font-size:12px;color:var(--fg3,#999);margin-bottom:6px;">新密码</div>
+        <input type="password" id="pf-new-pwd" placeholder="6-20位新密码" style="width:100%;border:none;outline:none;font-size:16px;background:transparent;color:var(--fg,#333);padding:0;box-sizing:border-box;">
+      </div>
+      <div style="padding:14px 16px;">
+        <div style="font-size:12px;color:var(--fg3,#999);margin-bottom:6px;">确认新密码</div>
+        <input type="password" id="pf-confirm-pwd" placeholder="再次输入新密码" style="width:100%;border:none;outline:none;font-size:16px;background:transparent;color:var(--fg,#333);padding:0;box-sizing:border-box;">
+      </div>
+    </div>
+    <button id="pf-submit" style="width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent,#2563eb);color:#fff;font-size:16px;font-weight:500;cursor:pointer;">确认修改</button>
+  </div>
+</div>
+
+<!--自动更新提示弹窗 -->
+<div id="update-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title" id="upd-title">发现新版本</div>
+    <div class="cf-message" id="upd-message"></div>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+      <button id="upd-go" class="btn-primary">下载</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建文件夹弹窗 -->
+<div id="newfolder-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title">新建文件夹</div>
+    <input id="newfolder-input" type="text" placeholder="请输入文件夹名称">
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+      <button id="newfolder-ok" class="btn-primary">创建</button>
+    </div>
+  </div>
+</div>
+<!-- 上传方式选择弹窗 -->
+<div id="upload-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title">上传到当前文件夹</div>
+    <button id="up-choice-file" class="btn-ghost-row">选择文件</button>
+    <button id="up-choice-folder" class="btn-ghost-row">选择文件夹（保留目录结构）</button>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加账号弹窗 -->
+<div id="account-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title">添加账号</div>
+    <div class="field">
+      <label>账号</label>
+      <input id="account-user" type="text" placeholder="手机号 / 邮箱" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="account-pass" type="password" placeholder="请输入密码" autocomplete="current-password">
+    </div>
+    <div class="account-msg" id="account-msg"></div>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>取消</button>
+      <button id="account-ok" class="btn-primary">登录并添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 账号列表弹层（覆盖式底部 sheet，不占用"我的"页布局高度；只列其他账号+末尾添加，不重复当前账号） -->
+<div id="account-sheet" class="sheet hidden">
+  <div class="sheet-mask" data-close></div>
+  <div class="sheet-panel">
+    <div class="sheet-title" id="account-sheet-title">切换账号</div>
+    <div class="acct-sheet-list" id="account-sheet-list"></div>
+    <div class="sheet-item cancel" data-close>取消</div>
+  </div>
+</div>
+
+<!-- 账号操作菜单（切换/删除） -->
+<div id="account-action" class="sheet hidden">
+  <div class="sheet-mask" data-close></div>
+  <div class="sheet-panel">
+    <div class="sheet-title" id="account-action-title">账号操作</div>
+    <div class="account-actions" id="account-actions-body"></div>
+    <div class="sheet-item cancel" data-close>取消</div>
+  </div>
+</div>
+
+<!-- 我的分享页 -->
+<div id="page-shares" class="page-cover hidden">
+  <div class="pc-head">
+    <span class="pc-back" id="shares-back">‹</span>
+    <span class="pc-title">我的分享</span>
+  </div>
+  <div class="pc-body" id="shares-list"></div>
+</div>
+
+<!-- 接收分享页 -->
+<div id="page-receive" class="page-cover hidden">
+  <div class="pc-head">
+    <span class="pc-back" id="receive-back">‹</span>
+    <span class="pc-title">接收分享</span>
+  </div>
+  <div class="pc-body">
+    <div class="rc-inputs">
+      <input id="receive-link" type="text" placeholder="粘贴分享链接或分享码" autocomplete="off">
+      <input id="receive-pwd" type="text" placeholder="提取码（如有）" autocomplete="off">
+      <button id="receive-open" class="btn-primary rc-open">打开分享</button>
+    </div>
+    <div class="rc-tip" id="receive-tip"></div>
+    <div class="receive-crumbs hidden" id="receive-crumbs"></div>
+    <div id="receive-list"></div>
+  </div>
+  <div class="rc-bar hidden" id="receive-bar">
+    <span id="receive-selinfo">已选 0 项</span>
+    <button id="receive-save" class="rc-save">转存到网盘</button>
+  </div>
+</div>
+
+<!-- 文件预览页（图片 / 音视频 / 文本 / PDF / Word / Excel） -->
+<div id="page-preview" class="page-cover hidden">
+  <div class="pc-head">
+    <span class="pc-back" id="pv-back">‹</span>
+    <span class="pc-title" id="pv-title">文件预览</span>
+    <button class="pc-btn" id="pv-copy">复制链接</button>
+  </div>
+  <div class="pc-body" id="pv-body"></div>
+</div>
+
+<!-- 一键查重结果面板 -->
+<div id="dup-page" class="page-cover hidden">
+  <div class="pc-head">
+    <span class="pc-back" id="dup-back">‹</span>
+    <span class="pc-title">重复文件</span>
+    <button class="pc-btn" id="dup-rescan">重新扫描</button>
+  </div>
+  <div class="dup-summary" id="dup-summary"></div>
+  <div class="dup-body" id="dup-body"></div>
+  <div class="dup-bar hidden" id="dup-bar">
+    <span id="dup-selinfo">已选 0 项</span>
+    <button id="dup-organize" class="dup-btn">整理</button>
+    <button id="dup-delete" class="dup-btn danger">删除重复项</button>
+  </div>
+</div>
+
+<!-- 排序面板 -->
+<div id="sort-sheet" class="sheet hidden">
+  <div class="sheet-mask" data-close></div>
+  <div class="sheet-panel">
+    <div class="sheet-title">排序方式</div>
+    <div class="sort-opts" id="sort-fields">
+      <div class="sort-opt" data-by="file_name"><span>文件名</span></div>
+      <div class="sort-opt" data-by="file_size"><span>大小</span></div>
+      <div class="sort-opt" data-by="updated_at"><span>修改时间</span></div>
+      <div class="sort-opt" data-by="file_id"><span>默认排序</span></div>
+    </div>
+    <div class="sort-dir-row">
+      <span>排序方向</span>
+      <div class="sort-dir" id="sort-dir">
+        <button class="sd-btn" data-dir="asc">升序 ↑</button>
+        <button class="sd-btn" data-dir="desc">降序 ↓</button>
+      </div>
+    </div>
+    <div class="sheet-item cancel" data-close>关闭</div>
+  </div>
+</div>
+
+<!-- 创建分享配置面板（选有效期 + 分享形式） -->
+<div id="share-config-modal" class="sheet hidden">
+  <div class="sheet-mask" data-close></div>
+  <div class="sheet-panel sc-panel">
+    <div class="sc-handle"></div>
+    <div class="sc-title">创建分享</div>
+    <div class="sc-group">
+      <div class="sc-group-title">有效期</div>
+      <div class="sc-pills" id="sc-expire">
+        <label class="sc-pill"><input type="radio" name="sc-expire" value="1"><span>1天</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-expire" value="2"><span>7天</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-expire" value="3"><span>30天</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-expire" value="4" checked><span>永久有效</span></label>
+      </div>
+    </div>
+    <div class="sc-group">
+      <div class="sc-group-title">分享形式</div>
+      <div class="sc-pills" id="sc-pwd">
+        <label class="sc-pill"><input type="radio" name="sc-pwd" value="2"><span>无提取码</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-pwd" value="1" checked><span>随机提取码</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-pwd" value="3"><span>自定义提取码</span></label>
+        <label class="sc-pill"><input type="radio" name="sc-pwd" value="4"><span>直连分享</span></label>
+      </div>
+    </div>
+    <div class="sc-custom hidden" id="sc-custom">
+      <input id="sc-pwd-input" type="text" maxlength="4" placeholder="请输入4位提取码">
+    </div>
+    <div class="sc-btns">
+      <button class="sc-btn cancel" data-close>取消</button>
+      <button class="sc-btn primary" id="sc-create">创建分享</button>
+    </div>
+  </div>
+</div>
+
+<!-- 分享结果弹窗 -->
+<div id="share-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title" id="share-title">分享链接</div>
+    <div class="share-box">
+      <div class="share-link" id="share-link"></div>
+    </div>
+    <div class="share-pwd-row" id="share-pwd-row" style="display:none">
+      <span class="share-pwd-label">提取码</span>
+      <span class="share-pwd" id="share-pwd"></span>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>关闭</button>
+      <button id="share-copy" class="btn-primary">复制链接</button>
+    </div>
+  </div>
+</div>
+
+<!-- 上传文件隐藏输入 -->
+<input type="file" id="upload-input" hidden multiple>
+
+<!-- 上传进度条浮层 -->
+<div id="upload-progress" class="hidden">
+  <div class="up-mask"></div>
+  <div class="up-panel">
+    <div class="up-title" id="up-title">上传中</div>
+    <div class="up-name" id="up-name"></div>
+    <div class="up-bar"><div class="up-bar-fill" id="up-bar-fill"></div></div>
+    <div class="up-pct" id="up-pct">0%</div>
+  </div>
+</div>
+
+<!-- 移动文件（文件夹选择器） -->
+<div id="move-picker" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel move-panel">
+    <div class="modal-title">移动文件</div>
+    <div class="picker-crumb" id="picker-crumb"></div>
+    <div class="move-tip">选择要把文件移动到的文件夹（点击"确定移动"移入当前目录）</div>
+    <div class="picker-list" id="picker-list"></div>
+    <div class="modal-btns">
+      <button class="btn-plain" id="picker-cancel">取消</button>
+      <button class="btn-primary" id="picker-confirm">确定移动</button>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏的 SVG 图标定义 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 3v12M7 8l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2zM12 11v6M9 14h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 3v12M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M6 11l6 6 6-6M4 21h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-rename" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6zM10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-hdd" viewBox="0 0 24 24"><path d="M3 13v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3M3 13l2.5-7A2 2 0 0 1 7.4 5h9.2a2 2 0 0 1 1.9 1.4L21 13M3 13h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 10l6-4v12l-6-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-audio" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6V4h16v2M12 4v16M9 20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-apk" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8h.01M15 8h.01M9 14h6a3 3 0 0 1-6 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M19 3l-7 7M8 12l-5 9 9-5M13 8l3 3M14 7l3 3M15 6l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-find-dup" viewBox="0 0 24 24"><rect x="3" y="3" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="9" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<script src="app.js"></script>
+</body>
+</html>
