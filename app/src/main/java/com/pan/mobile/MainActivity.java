@@ -1525,12 +1525,48 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** 相册缩略图：下载缩略图转 base64 返回给前端 */
+    void getThumbnailImpl(final String callback, final long fileId) {
+        executor.execute(new Runnable() {
+            @Override public void run() {
+                String result = "";
+                try {
+                    String token = prefs.getString(KEY_TOKEN, "");
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                        new java.net.URL("https://api.123pan.cn/api/file/thumbnail?fileId=" + fileId).openConnection();
+                    c.setConnectTimeout(10000);
+                    c.setReadTimeout(10000);
+                    c.setRequestProperty("authorization", "Bearer " + token);
+                    c.setRequestProperty("platform", "web");
+                    c.setRequestProperty("user-agent", "123pan/v2.4.0(" + osVersion + ";Xiaomi)");
+                    int code = c.getResponseCode();
+                    if (code == 200) {
+                        java.io.InputStream is = c.getInputStream();
+                        byte[] buf = new byte[8192];
+                        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                        int n;
+                        while ((n = is.read(buf)) != -1) bos.write(buf, 0, n);
+                        result = android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP);
+                    }
+                } catch (Exception e) {
+                    Log.e("PAN", "thumb fail: " + fileId, e);
+                }
+                final String r = result;
+                handler.post(new Runnable() {
+                    @Override public void run() {
+                        if (webView != null) webView.evaluateJavascript(callback + "('" + r + "');", null);
+                    }
+                });
+            }
+        });
+    }
+
     /** 基础 HTTP 请求 */
     private String httpRequest(String method, String url, String body, boolean withAuth)
             throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(15000);
-        conn.setReadTimeout(20000);
+        conn.setReadTimeout(url != null && url.contains("offline_download") ? 60000 : 20000);
         conn.setRequestMethod(method);
         // 复刻 123pan-open 的标准请求头
         String token = prefs.getString(KEY_TOKEN, "");
@@ -2988,6 +3024,12 @@ public class MainActivity extends Activity {
         public void apiRequest(final String callback, final String method,
                                final String url, final String body, final boolean withAuth) {
             act.doApi(callback, method, url, body, withAuth);
+        }
+
+        // 获取文件缩略图（相册用）：下载缩略图转 base64 返回
+        @JavascriptInterface
+        public void getThumbnail(final String callback, final long fileId) {
+            act.getThumbnailImpl(callback, fileId);
         }
 
         @JavascriptInterface

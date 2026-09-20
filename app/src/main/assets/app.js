@@ -312,13 +312,18 @@
     if (v === 'transfers') { renderTransfers(); startProgressPolling(); }
     else { stopProgressPolling(); }
     if (v === 'files') {
-      if (!$('file-list').dataset.loaded) loadList();
-      // 恢复文件列表滚动位置
-      var sc2 = $('content');
-      if (sc2 && state.filesScrollTop) {
-        var target = state.filesScrollTop;
-        requestAnimationFrame(function () { sc2.scrollTop = target; });
-      }
+      // 从相册模式切回文件页：重置相册模式并重新加载文件列表
+      if (state.galleryMode) { state.galleryMode = false; loadList(); }
+      else if (!$('file-list').dataset.loaded) loadList();
+    } else {
+      // 切到其他页时退出相册模式
+      state.galleryMode = false;
+    }
+    // 恢复文件列表滚动位置
+    var sc2 = $('content');
+    if (sc2 && state.filesScrollTop) {
+      var target = state.filesScrollTop;
+      requestAnimationFrame(function () { sc2.scrollTop = target; });
     }
   }
 
@@ -532,14 +537,177 @@
       }
     } catch (e) { /* 忽略轮询解析错误 */ }
   }
+  // 相册模式：BFS 递归遍历目录，收集图片/视频
+  var GALLERY_EXT = ['jpg','jpeg','png','gif','webp','bmp','heic','mp4','mov','avi','mkv','webm','m4v'];
+  function isGalleryFile(name) {
+    if (!name) return false;
+    var ext = name.split('.').pop().toLowerCase();
+    return GALLERY_EXT.indexOf(ext) >= 0;
+  }
+  function loadGallery() {
+    var box = $('file-list');
+    if (!box) return;
+    box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>正在扫描网盘...</p><p class="panel-sub" id="gallery-progress">0 个目录已扫描</p></div>';
+    var found = [];
+    var queue = [0];
+    var visited = {};
+    var inFlight = 0;
+    var scanned = 0;
+    var CONCURRENCY = 6;
+    function pump() {
+      while (inFlight < CONCURRENCY && queue.length) {
+        var pid = queue.shift();
+        if (visited[pid]) continue;
+        visited[pid] = true;
+        inFlight++;
+        (function (pid) {
+          api('GET', API.list + '?driveId=0&limit=200&next=0&orderBy=file_id&orderDirection=desc&parentFileId=' + pid + '&trashed=false&SearchData=&Page=1&OnlyLookAbnormalFile=0', '', true, function (d) {
+            inFlight--;
+            // 已退出相册模式，停止后续渲染
+            if (!state.galleryMode) { queue.length = 0; return; }
+            scanned++;
+            var pg = $('gallery-progress');
+            if (pg) pg.textContent = scanned + ' 个目录已扫描，找到 ' + found.length + ' 个图片/视频';
+            if (!d || d.code !== 0) { pump(); return; }
+            var list = (d.data && (d.data.InfoList || d.data.infoList)) || [];
+            for (var i = 0; i < list.length; i++) {
+              var f = list[i];
+              if (f.Type === 1) { queue.push(f.FileId); }
+              else if (isGalleryFile(f.FileName)) { found.push(f); }
+            }
+            // 增量渲染
+            if (found.length) renderGalleryGrid(found);
+            pump();
+          });
+        })(pid);
+      }
+      if (inFlight === 0 && !queue.length) {
+        if (!found.length) {
+          box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>相册为空</p><p class="panel-sub">未找到图片/视频</p></div>';
+        } else {
+          renderGalleryGrid(found);
+        }
+      }
+    }
+    pump();
+  }
+  function renderGalleryGrid(files) {
+    var box = $('file-list');
+    if (!box) return;
+    if (!files.length) {
+      box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="image"></div><p>相册为空</p><p class="panel-sub">未找到图片/视频</p></div>';
+      return;
+    }
+    var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px;">';
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var isVideo = /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(f.FileName || '');
+      var nm = (f.FileName || '未命名');
+      var shortNm = nm.length > 14 ? nm.slice(0, 13) + '…' : nm;
+      html += '<div style="aspect-ratio:1;background:var(--divider,#eee);border-radius:8px;overflow:hidden;position:relative;cursor:pointer;" data-gi="' + i + '" data-fid="' + (f.FileId||'') + '">'
+        + '<img data-thumb="' + i + '" src="" style="width:100%;height:100%;object-fit:cover;display:none;" />'
+        + '<div class="ph" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:14px;color:var(--fg3,#999);padding:4px;box-sizing:border-box;">'
+        + '<div style="font-size:28px;">' + (isVideo ? '🎬' : '🖼️') + '</div>'
+        + '<div style="font-size:10px;text-align:center;line-height:1.2;word-break:break-all;">' + shortNm + '</div>'
+        + '</div>'
+        + (isVideo ? '<div style="position:absolute;top:4px;right:4px;font-size:16px;text-shadow:0 1px 3px rgba(0,0,0,0.5);">▶️</div>' : '')
+        + '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.7));color:#fff;font-size:10px;padding:14px 4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + shortNm + '</div>'
+        + '</div>';
+    }
+    html += '</div>';
+    box.innerHTML = html;
+    // 点击缩略图预览
+    box.querySelectorAll('[data-gi]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var f = files[parseInt(el.getAttribute('data-gi'))];
+        openPreview(f);
+      });
+    });
+    // 加载缩略图
+    box.querySelectorAll('[data-thumb]').forEach(function (img) {
+      var i = parseInt(img.getAttribute('data-thumb'));
+      var f = files[i];
+      if (!f || !f.FileId) return;
+      var cb = '_thumb_' + Date.now() + '_' + i;
+      window[cb] = function (b64) {
+        try {
+          if (b64 && b64.length > 100) {
+            img.src = 'data:image/jpeg;base64,' + b64;
+            img.style.display = 'block';
+            var ph = img.parentElement.querySelector('.ph');
+            if (ph) ph.style.display = 'none';
+          }
+        } catch (e) {}
+        try { delete window[cb]; } catch (e) {}
+      };
+      bridge.getThumbnail(cb, Number(f.FileId));
+    });
+  }
+
+  // 离线下载：先解析资源，再提交
+  function doOfflineDownload() {
+    var url = ($('offline-url').value || '').trim();
+    if (!url) { toast('请输入链接'); return; }
+    var out = $('offline-result');
+    out.textContent = '正在解析...';
+    api('POST', 'https://api.123278.com/b/api/v2/offline_download/task/resolve',
+      JSON.stringify({ urls: url }), true, function (d) {
+        if (!d || (d.code !== 0 && d.Code !== 0)) {
+          out.textContent = '解析失败：' + JSON.stringify(d).slice(0, 300);
+          return;
+        }
+        var data = d.data || d.Data || {};
+        // 返回结构可能是 data.list[0]，里面含 resource_id / url / name
+        var list = data.list || data.List || [];
+        var first = list[0] || {};
+        // err_code: 0=成功, 非0=解析失败
+        if (first.err_code && first.err_code !== 0) {
+          out.textContent = '磁力链接解析失败（err_code=' + first.err_code + '），请确认磁力链接有效且 tracker 可达。\n原始返回：' + JSON.stringify(data).slice(0, 200);
+          return;
+        }
+        var rid = first.id || first.ID || first.resource_id || 0;
+        if (!rid) {
+          out.textContent = '解析返回：' + JSON.stringify(data).slice(0, 300);
+          return;
+        }
+        out.textContent = '已解析：' + (list[0] && list[0].name) + '（' + (list[0] && list[0].size) + ' 字节），正在提交...';
+        var selFiles = (list[0] && list[0].files && list[0].files.map(function (f) { return f.id || f.ID; })) || [];
+        api('POST', 'https://api.123278.com/b/api/v2/offline_download/task/submit',
+          JSON.stringify({ resource_list: [{ resource_id: rid, select_file_id: selFiles }] }), true, function (d2) {
+            if (d2 && (d2.code === 0 || d2.Code === 0)) {
+              out.textContent = '✅ 离线下载已提交，文件稍后出现在网盘根目录（如未出现请到官方App查看离线任务列表）';
+              $('offline-url').value = '';
+            } else {
+              out.textContent = '提交失败：' + ((d2 && d2.message) || JSON.stringify(d2).slice(0, 300));
+            }
+          });
+      });
+  }
+
   function renderTransfers() {
     var box = $('transfer-list');
     var empty = $('transfer-empty');
+    if (!box) return;
+    // 离线下载页：显示表单
+    if (state.transferTab === 'offline') {
+      if (tbD) tbD.classList.remove('active');
+      if (tbU) tbU.classList.remove('active');
+      var tbo = $('ttab-offline');
+      if (tbo) tbo.classList.add('active');
+      if (empty) hide(empty);
+      box.innerHTML = '<div style="padding:16px;">'
+        + '<div style="font-size:13px;color:var(--fg3,#999);margin-bottom:8px;">输入磁力链接或 HTTP(S) 直链，提交后云端离线下载到你的网盘</div>'
+        + '<textarea id="offline-url" placeholder="magnet:?xt=... 或 https://..." style="width:100%;height:90px;border:1px solid var(--divider,#ddd);border-radius:8px;padding:10px;box-sizing:border-box;font-size:14px;background:var(--card,#fff);color:var(--fg,#333);resize:vertical;"></textarea>'
+        + '<button id="offline-go" style="margin-top:12px;width:100%;padding:12px;border:none;border-radius:8px;background:var(--accent,#2563eb);color:#fff;font-size:15px;">提交离线下载</button>'
+        + '<div id="offline-result" style="margin-top:12px;font-size:13px;color:var(--fg2,#666);line-height:1.6;"></div>'
+        + '</div>';
+      $('offline-go').addEventListener('click', doOfflineDownload);
+      return;
+    }
     var arr = state.transfers || loadTransfers();
     state.transfers = arr;
     var ups = state.upQueue || loadUpQueue();
     state.upQueue = ups;
-    if (!box) return;
     var tab = state.transferTab === 'upload' ? 'upload' : 'download';
     var list = (tab === 'upload') ? ups : arr;
     // 同步子页签高亮
@@ -3743,7 +3911,7 @@
     // 传输页子页签切换（下载 / 上传）
     document.querySelectorAll('#view-transfers .ttab').forEach(function (b) {
       b.addEventListener('click', function () {
-        state.transferTab = b.getAttribute('data-ttab') === 'upload' ? 'upload' : 'download';
+        state.transferTab = b.getAttribute('data-ttab');
         try { localStorage.setItem('pan_ttab', state.transferTab); } catch (e) {}
         renderTransfers();
       });
@@ -3777,6 +3945,13 @@
     });
     $('newfolder-ok').addEventListener('click', doNewFolder);
     $('newfolder-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') doNewFolder(); });
+    // 相册模式：递归加载全盘图片/视频网格
+    var galleryBtn = $('tool-gallery');
+    if (galleryBtn) galleryBtn.addEventListener('click', function () {
+      if (state.galleryMode) { state.galleryMode = false; loadList(); return; }
+      state.galleryMode = true;
+      loadGallery();
+    });
     // 上传
     // 上传：弹出方式选择（文件 / 文件夹）；文件由原生接管，文件夹走 SAF 目录树
     $('tool-upload').addEventListener('click', doUpload);
