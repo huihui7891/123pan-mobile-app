@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.pan.mobile"
+    package="com.yunpan.mobile"
     android:versionCode="170"
     android:versionName="1.7.0">
 
@@ -10,14 +10,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="123云盘"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
@@ -33,7 +33,7 @@
 
         <provider
             android:name=".PanProvider"
-            android:authorities="com.pan.mobile.pan"
+            android:authorities="com.yunpan.mobile.pan"
             android:grantUriPermissions="true"
             android:exported="true" />
     </application>

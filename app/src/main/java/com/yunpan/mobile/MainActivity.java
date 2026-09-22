@@ -1,4 +1,4 @@
-package com.pan.mobile;
+package com.yunpan.mobile;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -1474,7 +1474,7 @@ public class MainActivity extends Activity {
                 logDl("OPEN no file found (non-apk), toast");
                 return;
             }
-            String contentUri = "content://com.pan.mobile.pan/file?path=" + Uri.encode(f.getAbsolutePath());
+            String contentUri = "content://com.yunpan.mobile.pan/file?path=" + Uri.encode(f.getAbsolutePath());
             Uri cu = Uri.parse(contentUri);
             logDl("OPEN via PanProvider uri=" + cu + " size=" + (f != null ? f.length() : 0));
             Log.d("PAN", "open file: " + f.getAbsolutePath());

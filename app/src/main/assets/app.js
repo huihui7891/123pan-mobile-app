@@ -3395,25 +3395,13 @@
     hide($('update-modal'));
     var info = state.updateInfo || {};
     state.updateInfo = null;
-    if (!info.url) { toast('未找到安装包下载地址，可前往 Releases 页手动下载'); return; }
-    var fname = '123pan-mobile-' + (info.version || 'new') + '.apk';
-    // 更新包下载改用自研下载器（原生侧自动做「直连→镜像回退→自动重试→字节校验」），
-    // 不再走系统 DownloadManager 单一直连（CN 网络下易失败且失败后无恢复手段）。
-    var useStream = !!(bridge && bridge.downloadStream);
-    try {
-      var id = useStream ? Number(bridge.downloadStream(info.url, fname, Number(info.size) || 0))
-        : (bridge && bridge.download ? bridge.download(info.url, fname) : 0);
-      if (Number(id) > 0) {
-        //注册到传输列表：轮询同步进度与完成状态，完成后点「打开」直接安装
-        addTransfer({ id: Number(id), name: fname, size: Number(info.size) || 0, total: Number(info.size) || 0, status: 'downloading', stream: useStream, link: info.url });
-        startProgressPolling();
-        if (state.view === 'transfers') renderTransfers();
-        toast('已加入下载任务，完成后可在传输页打开安装');
-      } else {
-        toast('下载启动失败，请稍后重试');
-      }
-    } catch (e) {
-      toast('下载失败：' + (e && e.message ? e.message : e));
+    // 移除了 REQUEST_INSTALL_PACKAGES 权限以降低杀毒软件误报，
+    // 改为直接用浏览器打开 Releases 页面手动下载安装。
+    var releaseUrl = 'https://github.com/sillycats/123pan-mobile-app/releases/latest';
+    if (bridge && bridge.openExternalWeb) {
+      bridge.openExternalWeb(releaseUrl);
+    } else {
+      toast('请前往 GitHub Releases 页面手动下载更新');
     }
   }
   //原生回调：GitHub 最新 Release 信息

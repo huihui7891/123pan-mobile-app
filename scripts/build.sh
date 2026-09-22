@@ -50,7 +50,7 @@ grep -E 'versionCode|versionName' "$W/AndroidManifest.xml"
 # 3) compile java
 find "$MAIN/java" -name '*.java' > "$W/sources.txt"
 javac -source 1.8 -target 1.8 -cp "$ANDROID_JAR" \
-    -d "$W/obj" @"$W/sources.txt" "$W/gen/com/pan/mobile/R.java" 2>&1 | head -30
+    -d "$W/obj" @"$W/sources.txt" "$W/gen/com/yunpan/mobile/R.java" 2>&1 | head -30
 
 # 4) dex with d8
 "$BT/d8" --release --lib "$ANDROID_JAR" --output "$W/apk" \

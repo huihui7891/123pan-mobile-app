@@ -1,4 +1,4 @@
-package com.pan.mobile;
+package com.yunpan.mobile;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -12,7 +12,7 @@ import java.io.FileNotFoundException;
 /**
  * 轻量文件 Provider：把 /sdcard/Download 下的文件以 content:// 形式暴露给
  * 其它 App（系统"打开/安装"），从而规避 API 24+ 的 FileUriExposedException。
- * 用法：content://com.pan.mobile.pan/file?path=<绝对路径>
+ * 用法：content://com.yunpan.mobile.pan/file?path=<绝对路径>
  */
 public class PanProvider extends ContentProvider {
 
