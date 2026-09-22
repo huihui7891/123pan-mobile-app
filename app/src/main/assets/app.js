@@ -986,13 +986,20 @@
       body.appendChild(name); body.appendChild(meta);
       // 快捷方式按钮已移除：文件/文件夹的下载、删除等操作统一点击卡片后经操作浮层执行
       card.appendChild(iconWrap); card.appendChild(body);
-      // 事件：多选模式下点击切换选中态，否则弹出操作浮层（文件夹浮层含"打开"入口）
+      // 事件：多选模式下点击切换选中态；文件夹单击进入、长按弹操作浮层；文件单击/长按弹操作浮层
       card.addEventListener('click', function (e) {
         if (state.selectMode) {
           toggleSelect(item);
+        } else if (item.Type === 1) {
+          openDir(item);
         } else {
           openActionSheet(item);
         }
+      });
+      // 长按弹操作浮层（contextmenu 在 Android WebView 长按触发）
+      card.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        if (!state.selectMode) openActionSheet(item);
       });
       box.appendChild(card);
     });
