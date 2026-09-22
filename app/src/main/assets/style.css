@@ -55,6 +55,29 @@
 [data-theme="dark"] .file-icon-wrap.fi-text { background: #2a2a2a; color: #9ca3af; }
 [data-theme="dark"] .file-icon-wrap.fi-code { background: #132e2c; color: #2dd4bf; }
 [data-theme="dark"] .file-icon-wrap.fi-doc { background: #1e2a45; color: #60a5fa; }
+[data-theme="dark"] .modal-panel { background: #1a1d24; color: #c8cdd5; }
+[data-theme="dark"] .sheet-panel { background: #22262e; color: #c8cdd5; }
+[data-theme="dark"] .modal-title, [data-theme="dark"] .sheet-title { color: #c8cdd5; }
+[data-theme="dark"] .cf-message { color: #c8cdd5; }
+[data-theme="dark"] .sc-title { color: #c8cdd5; }
+[data-theme="dark"] .mine-item, [data-theme="dark"] .mine-label { color: #c8cdd5; }
+[data-theme="dark"] .mine-val { color: #9aa0aa; }
+[data-theme="dark"] .mine-section-title { color: #9aa0aa; }
+[data-theme="dark"] .file-name { color: #c8cdd5; }
+[data-theme="dark"] .file-meta { color: #9aa0aa; }
+[data-theme="dark"] .crumb { color: #9aa0aa; }
+[data-theme="dark"] .crumb.active { color: #c8cdd5; }
+[data-theme="dark"] .tool-btn { color: #9aa0aa; }
+[data-theme="dark"] .transfer-name { color: #c8cdd5; }
+[data-theme="dark"] .transfer-sub { color: #9aa0aa; }
+[data-theme="dark"] .recycle-name { color: #c8cdd5; }
+[data-theme="dark"] .recycle-meta { color: #9aa0aa; }
+[data-theme="dark"] .share-item-name { color: #c8cdd5; }
+[data-theme="dark"] .share-item-sub { color: #9aa0aa; }
+[data-theme="dark"] .dup-name { color: #c8cdd5; }
+[data-theme="dark"] .dup-meta { color: #9aa0aa; }
+[data-theme="dark"] .pdir-name { color: #c8cdd5; }
+[data-theme="dark"] .panel-empty p { color: #9aa0aa; }
 
 * {
   box-sizing: border-box;
@@ -264,9 +287,9 @@ svg { display: block; }
 .mine-item {
   display: flex; align-items: center; justify-content: space-between;
   background: var(--card); padding: 15px 16px; margin-bottom: 10px; border-radius: 12px;
-  border: 1px solid var(--border); font-size: 14px;
+  border: 1px solid var(--border); font-size: 14px; color: var(--fg);
 }
-.mine-label { display: flex; align-items: center; gap: 8px; }
+.mine-label { display: flex; align-items: center; gap: 8px; color: var(--fg); }
 .mi-icon { width: 18px; height: 18px; color: var(--accent); }
 .mine-val { color: var(--fg3); font-size: 13px; }
 
@@ -403,7 +426,7 @@ svg { display: block; }
 .modal { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; }
 .modal-mask { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
 .modal-panel {
-  position: relative; width: 84%; max-width: 340px; background: var(--card); border-radius: 16px;
+  position: relative; width: 84%; max-width: 340px; background: var(--card); color: var(--fg); border-radius: 16px;
   padding: 20px; animation: popIn .18s ease;
 }
 @keyframes popIn { from { transform: scale(.92); opacity: .5; } to { transform: none; opacity: 1; } }
@@ -425,7 +448,7 @@ svg { display: block; }
 
 /* 自定义确认弹窗（替代原生 confirm） */
 .cf-message {
-  font-size: 15px; color: #1f2329; line-height: 1.6; text-align: center;
+  font-size: 15px; color: var(--fg); line-height: 1.6; text-align: center;
   word-break: break-all; padding: 4px 0 2px;
 }
 .modal-btns .btn-primary.danger { background: var(--danger-bg); color: var(--danger); }
@@ -446,7 +469,7 @@ svg { display: block; }
 /* ---- 创建分享配置面板（胶囊分段选择） ---- */
 .sc-panel { padding: 22px 18px 24px; }
 .sc-handle { width: 36px; height: 4px; margin: 0 auto 18px; border-radius: 2px; background: #e3e6ee; }
-.sc-title { text-align: center; font-size: 16px; font-weight: 700; color: #14181f; margin-bottom: 20px; }
+.sc-title { text-align: center; font-size: 16px; font-weight: 700; color: var(--fg); margin-bottom: 20px; }
 .sc-group { margin-bottom: 18px; }
 .sc-group-title { font-size: 13px; color: var(--fg3); margin-bottom: 10px; padding-left: 2px; }
 .sc-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -742,8 +765,8 @@ svg { display: block; }
 .dup-icon { flex: 0 0 auto; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
 .dup-icon svg { width: 26px; height: 26px; }
 .dup-info { flex: 1; min-width: 0; }
-.dup-name { font-size: 14px; color: #1f2430; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dup-meta { font-size: 12px; color: #98a1b3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dup-name { font-size: 14px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dup-meta { font-size: 12px; color: var(--fg3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dup-keep-badge {
   flex: 0 0 auto; font-size: 11px; color: #16a34a; background: var(--ok-bg);
   border-radius: 999px; padding: 3px 10px;
