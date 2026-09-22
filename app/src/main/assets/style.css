@@ -12,7 +12,7 @@
   --danger: #e5484d;
   --danger-bg: #fdecec;
   --warn: #f5a623;
-  --warn-bg: var(--warn-bg);
+  --warn-bg: #fff4d6;
   --ok: #22c55e;
   --ok-bg: #e9f9ef;
   --tabbar-bg: #ffffff;
@@ -45,6 +45,16 @@
   --hover: rgba(255,255,255,.06);
   --shadow: rgba(0,0,0,.4);
 }
+[data-theme="dark"] .file-icon-wrap.fi-folder { background: #3a2f1e; color: #f5b04a; }
+[data-theme="dark"] .file-icon-wrap.fi-image { background: #1d3325; color: #34d06a; }
+[data-theme="dark"] .file-icon-wrap.fi-video { background: #2d1f4a; color: #a78bfa; }
+[data-theme="dark"] .file-icon-wrap.fi-audio { background: #3a2a1a; color: #fb923c; }
+[data-theme="dark"] .file-icon-wrap.fi-archive { background: #2a2a2a; color: #a8a29e; }
+[data-theme="dark"] .file-icon-wrap.fi-apk { background: #1d3325; color: #34d06a; }
+[data-theme="dark"] .file-icon-wrap.fi-table { background: #1e2a45; color: #60a5fa; }
+[data-theme="dark"] .file-icon-wrap.fi-text { background: #2a2a2a; color: #9ca3af; }
+[data-theme="dark"] .file-icon-wrap.fi-code { background: #132e2c; color: #2dd4bf; }
+[data-theme="dark"] .file-icon-wrap.fi-doc { background: #1e2a45; color: #60a5fa; }
 
 * {
   box-sizing: border-box;
@@ -170,23 +180,23 @@ svg { display: block; }
 }
 .file-card:last-child { border-bottom: none; }
 .file-icon-wrap {
-  width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; display: flex;
+  width: 42px; height: 42px; flex: 0 0 42px; border-radius: 10px; display: flex;
   align-items: center; justify-content: center; margin-right: 12px;
 }
-.file-icon-wrap.folder { background: var(--warn-bg); color: var(--warn); }
+.file-icon-wrap.folder { background: #fff4d6; color: #f5a623; }
 .file-icon-wrap.file { background: var(--accent-bg); color: var(--accent); }
 /* 按文件类型着色，让图标更形象、一眼可辨 */
-.file-icon-wrap.fi-folder { background: var(--warn-bg); color: var(--warn); }
-.file-icon-wrap.fi-image { background: var(--ok-bg); color: var(--ok); }
-.file-icon-wrap.fi-video { background: var(--accent-bg); color: var(--fg2); }
-.file-icon-wrap.fi-audio { background: var(--danger-bg); color: var(--danger); }
-.file-icon-wrap.fi-archive { background: var(--bg); color: var(--fg3); }
-.file-icon-wrap.fi-apk { background: var(--accent-bg); color: var(--ok); }
-.file-icon-wrap.fi-table { background: var(--accent-bg); color: var(--accent); }
-.file-icon-wrap.fi-text { background: var(--accent-bg); color: var(--fg2); }
-.file-icon-wrap.fi-code { background: var(--accent-bg); color: var(--accent); }
-.file-icon-wrap.fi-doc { background: var(--accent-bg); color: var(--accent); }
-.file-icon-wrap .file-icon { width: 22px; height: 22px; }
+.file-icon-wrap.fi-folder { background: #fff4d6; color: #f5a623; }
+.file-icon-wrap.fi-image { background: #e3f7e8; color: #16a34a; }
+.file-icon-wrap.fi-video { background: #ede9fe; color: #7c3aed; }
+.file-icon-wrap.fi-audio { background: #ffedd5; color: #ea580c; }
+.file-icon-wrap.fi-archive { background: #f1f0ef; color: #78716c; }
+.file-icon-wrap.fi-apk { background: #e3f7e8; color: #16a34a; }
+.file-icon-wrap.fi-table { background: #e0e9ff; color: #2b6de8; }
+.file-icon-wrap.fi-text { background: #f3f4f6; color: #6b7280; }
+.file-icon-wrap.fi-code { background: #ccfbf1; color: #0d9488; }
+.file-icon-wrap.fi-doc { background: #e0e9ff; color: #2b6de8; }
+.file-icon-wrap .file-icon { width: 24px; height: 24px; }
 .file-body { flex: 1; min-width: 0; }
 .file-name { font-size: 15px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-meta { font-size: 12px; color: var(--fg3); margin-top: 3px; }
@@ -537,13 +547,13 @@ svg { display: block; }
 /* 多选底部操作栏 */
 #select-toolbar {
   position: fixed; left: 0; right: 0; bottom: 56px; height: 58px; z-index: 20;
-  display: flex; align-items: center; padding: 0 16px; gap: 10px;
+  display: flex; align-items: center; padding: 0 10px; gap: 6px;
   background: rgba(255,255,255,.97); border-top: 1px solid var(--border); backdrop-filter: blur(6px);
 }
-#select-count { flex: 1; font-size: 14px; color: var(--fg2); font-weight: 500; }
+#select-count { flex: 0 0 auto; white-space: nowrap; font-size: 13px; color: var(--fg2); font-weight: 500; }
 .st-btn {
-  height: 36px; padding: 0 18px; border-radius: 18px; font-size: 14px; border: 1px solid var(--border);
-  background: var(--card); color: var(--fg2);
+  height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13px; border: 1px solid var(--border);
+  background: var(--card); color: var(--fg2); white-space: nowrap;
 }
 .st-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .st-btn.primary.disabled { background: var(--accent-bg); border-color: var(--accent-bg); color: #fff; }

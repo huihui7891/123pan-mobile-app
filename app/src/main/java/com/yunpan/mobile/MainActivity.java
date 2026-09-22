@@ -2112,7 +2112,7 @@ public class MainActivity extends Activity {
                             + "\",\"size\":" + size
                             + ",\"parentFileId\":" + parentFileId
                             + ",\"type\":0"
-                            + ",\"duplicate\":0}";
+                            + ",\"duplicate\":1}";
                         Log.d("PAN", "[1]upload_request req body=" + upBody);
                         Log.d("PAN", "[1]DEBUG token=" + token);
                         String upResp = httpRequestWithRetry("POST", API + "/b/api/file/upload_request", upBody, true, 2);

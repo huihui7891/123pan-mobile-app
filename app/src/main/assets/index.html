@@ -109,7 +109,7 @@
 
         <div class="mine-section-title">偏好设置</div>
         <div class="mine-item mine-item-btn" id="mine-theme"><span class="mine-label"><span class="mi-icon" data-icon="sun"></span>主题模式</span><span class="mine-val" id="theme-val">跟随系统</span><span class="mine-arrow">›</span></div>
-        <div class="mine-item mine-item-btn" id="mine-keep-screen"><span class="mine-label"><span class="mi-icon" data-icon="sun"></span>屏幕常亮</span><span class="ui-switch" id="keep-switch"></span></div>
+        <div class="mine-item mine-item-btn" id="mine-keep-screen"><span class="mine-label"><span class="mi-icon" data-icon="bulb"></span>屏幕常亮</span><span class="ui-switch" id="keep-switch"></span></div>
         <div class="mine-item mine-item-btn" id="mine-autoupdate"><span class="mine-label"><span class="mi-icon" data-icon="refresh"></span>自动更新</span><span class="ui-switch" id="upd-switch"></span></div>
 
         <button id="logout-btn" class="btn-danger">退出当前账号</button>
@@ -391,9 +391,9 @@
 <div id="move-picker" class="modal hidden">
   <div class="modal-mask" data-close></div>
   <div class="modal-panel move-panel">
-    <div class="modal-title">移动文件</div>
+    <div class="modal-title" id="picker-title">移动文件</div>
     <div class="picker-crumb" id="picker-crumb"></div>
-    <div class="move-tip">选择要把文件移动到的文件夹（点击"确定移动"移入当前目录）</div>
+    <div class="move-tip" id="picker-tip">选择目标文件夹后点击"确定移动"移入当前目录</div>
     <div class="picker-list" id="picker-list"></div>
     <div class="modal-btns">
       <button class="btn-plain" id="picker-cancel">取消</button>

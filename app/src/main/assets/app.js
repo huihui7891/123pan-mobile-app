@@ -242,7 +242,9 @@
     link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     broom: '<path d="M13.5 10.5L22 2m-7.266 11.841a2 2 0 0 0-.314-2.42L12.58 9.58a2 2 0 0 0-2.421-.314l-7.657 4.461A1 1 0 0 0 2.3 15.3l6.403 6.403a1 1 0 0 0 1.571-.204zM5 18l2-2m.699-5.3l5.602 5.601" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-    'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    sun: '<circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
   };
   function applySvg(el, name) {
     var inner = ICON_SVG[name];
@@ -1074,7 +1076,7 @@
     });
     api('POST', API.mkdir, mkdirBody, true, function (d) {
       if (!d || d.code !== 0) {
-        toast('创建文件夹失败: ' + ((d && d.message) || ''));
+        toast('创建文件夹失败：' + ((d && d.message) || ''));
         if (onDone) onDone();
         return;
       }
@@ -1158,7 +1160,8 @@
   function pickTargetAndMove(item, action) {
     state.selectedMap = {};
     state.selectedMap[item.FileId] = item;
-    state.pickerAction = action; // 'move' or 'copy'
+    state.pickerAction = action;
+    setPickerTitle(action);
     state.pickerState = { dir: 0, path: [] };
     show($('move-picker'));
     loadPickerDir(0, []);
@@ -1166,11 +1169,27 @@
   // 打开移动选择面板：从根目录开始浏览目录以选择目标文件夹
   function openMovePicker() {
     if (Object.keys(state.selectedMap).length === 0) { toast('请先选择要移动的文件'); return; }
+    state.pickerAction = 'move';
+    setPickerTitle('move');
     var selItems = [];
     for (var k in state.selectedMap) selItems.push(state.selectedMap[k]);
-    state.pickerState = { dir: 0, path: [] };   // 从根目录开始
+    state.pickerState = { dir: 0, path: [] };
     show($('move-picker'));
     loadPickerDir(0, []);
+  }
+  function setPickerTitle(action) {
+    var t = $('picker-title');
+    var tip = $('picker-tip');
+    var btn = $('picker-confirm');
+    if (action === 'copy') {
+      if (t) t.textContent = '复制文件';
+      if (tip) tip.textContent = '选择目标文件夹后点击"确定复制"复制到当前目录';
+      if (btn) btn.textContent = '确定复制';
+    } else {
+      if (t) t.textContent = '移动文件';
+      if (tip) tip.textContent = '选择目标文件夹后点击"确定移动"移入当前目录';
+      if (btn) btn.textContent = '确定移动';
+    }
   }
   function closeMovePicker() {
     hide($('move-picker'));
@@ -1317,10 +1336,8 @@
         if (d && d.code === 0) {
           closeMovePicker();
           exitSelectMode();
-          var taskId = d.data && d.data.taskId;
-          toast('已提交复制任务，正在后台复制...');
+          toast('已复制到目标目录');
           loadList();
-          if (taskId) pollCopyTask(taskId);
         } else {
           toast((d && d.message) || '复制失败');
         }
@@ -4026,6 +4043,7 @@
     $('select-move').addEventListener('click', openMovePicker);
     $('select-copy').addEventListener('click', function () {
       state.pickerAction = 'copy';
+      setPickerTitle('copy');
       state.pickerState = { dir: 0, path: [] };
       show($('move-picker'));
       loadPickerDir(0, []);
