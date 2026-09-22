@@ -19,10 +19,8 @@
 
   <!-- 主框架 -->
   <div id="page-main" class="hidden">
-    <header id="topbar">
+    <header id="topbar" style="display:none;">
       <span id="top-title">123云盘</span>
-      <span id="top-dup" data-icon="find-dup" title="一键查重"></span>
-      <span id="top-sort" data-icon="sort" title="排序"></span>
     </header>
 
     <!-- 内容区（文件 / 传输 / 我的 三个视图） -->
@@ -35,7 +33,12 @@
           <input id="search-input" type="text" placeholder="搜索全盘文件" autocomplete="off" enterkeyhint="search">
           <span id="search-clear" class="search-clear hidden" data-icon="x-circle"></span>
         </div>
-        <div id="breadcrumb"></div>
+        <div id="breadcrumb" style="display:flex;align-items:center;gap:8px;">
+          <span id="top-sort" data-icon="sort" title="排序" style="flex:0 0 auto;color:var(--fg3);padding:4px;"></span>
+          <div id="crumb-path" style="flex:1;min-width:0;"></div>
+          <span id="top-dup" data-icon="find-dup" title="一键查重" style="flex:0 0 auto;color:var(--fg3);padding:4px;"></span>
+        </div>
+        <div id="ptr-indicator" style="position:fixed;top:0;left:0;right:0;text-align:center;padding:8px;color:var(--fg3);font-size:13px;opacity:0;z-index:100;background:var(--bg);transition:opacity .2s;">下拉刷新</div>
         <div id="file-list"></div>
         <!-- 底部工具栏：整理 / 上传 / 新建 -->
         <div id="file-toolbar">

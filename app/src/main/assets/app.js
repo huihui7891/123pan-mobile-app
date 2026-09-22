@@ -889,7 +889,8 @@
 
   // ---------- 文件列表 ----------
   function renderBreadcrumb() {
-    var box = $('breadcrumb');
+    var box = $('crumb-path');
+    if (!box) box = $('breadcrumb');
     box.innerHTML = '';
     var root = document.createElement('span');
     root.className = 'crumb' + (state.currentDir === 0 ? ' active' : '');
@@ -936,21 +937,172 @@
     refreshSortSheet();
     if (state.searching && state.searchKeyword) { doSearch(state.searchKeyword); } else { loadList(); }
   }
+  var _listNext = 0;
+  var _listLoading = false;
+  // 格式化时间为 YYYY-MM-DD HH:mm:ss
+  function fmtTime(s) {
+    if (!s) return '';
+    if (typeof s === 'number') {
+      var d = new Date(s * (s < 1e12 ? 1000 : 1));
+      var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+        + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+    // 已经是字符串，把 T 换成空格，去掉时区部分（+08:00/Z 等）
+    return String(s).replace(/[T]/g, ' ').replace(/[+\-]\d{2}:\d{2}$/, '').replace(/Z$/, '');
+  }
+  // 从文件对象中提取时间字段（兼容不同字段名）
+  function pickTime(item) {
+    if (!item) return '';
+    var keys = ['UpdateAt', 'updateAt', 'UpdateTime', 'UpdatedTime', 'updateTime', 'ModifyTime', 'ModifiedTime', 'ModTime', 'Time', 'CreateTime', 'CreatedTime'];
+    for (var i = 0; i < keys.length; i++) {
+      if (item[keys[i]]) return item[keys[i]];
+    }
+    // 兜底：遍历所有字段找包含 time 的
+    for (var k in item) {
+      if (/time/i.test(k) && typeof item[k] === 'string' && item[k].length > 4) return item[k];
+    }
+    return '';
+  }
   function loadList() {
     renderBreadcrumb();
     var box = $('file-list');
     box.dataset.loaded = '1';
     box.innerHTML = '<div class="loading-dot">加载中...</div>';
-    var params = 'driveId=0&limit=200&next=0&orderBy=' + state.orderBy + '&orderDirection=' + state.orderDirection
+    _listNext = 0;
+    _currentList = [];
+    loadListPage();
+  }
+  function loadListPage() {
+    if (_listLoading) return;
+    _listLoading = true;
+    var box = $('file-list');
+    var params = 'driveId=0&limit=200&next=' + _listNext + '&orderBy=' + state.orderBy + '&orderDirection=' + state.orderDirection
       + '&parentFileId=' + state.currentDir + '&trashed=false&Page=1&OnlyLookAbnormalFile=0';
     api('GET', API.list + '?' + params, '', true, function (d) {
+      _listLoading = false;
       if (d && d.data && d.data.InfoList) {
-        renderList(d.data.InfoList, d.data.Total);
-      } else {
+        var list = d.data.InfoList;
+        var next = d.data.Next || 0;
+        _listNext = next;
+        if (_currentList.length === 0) {
+          box.innerHTML = '';
+        }
+        renderListAppend(list);
+        if (next > 0 && list.length > 0) {
+          var more = document.createElement('div');
+          more.className = 'load-more';
+          more.textContent = '上滑加载更多（剩余约 ' + (d.data.Total ? (d.data.Total - _currentList.length) : '?') + ' 项）';
+          more.id = 'load-more-hint';
+          box.appendChild(more);
+        }
+      } else if (_currentList.length === 0) {
         box.innerHTML = '<div class="panel-empty"><div class="panel-icon" data-icon="folder"></div><p>加载失败或需重新登录</p></div>';
         injectIcons(box);
       }
     });
+  }
+  // 滚动到底自动加载下一页
+  function setupListScroll() {
+    var box = $('file-list');
+    if (!box || box._scrollBound) return;
+    box._scrollBound = true;
+    window.addEventListener('scroll', function () {
+      if (state.view !== 'files') return;
+      if (_listLoading || _listNext <= 0) return;
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100) {
+        var hint = $('load-more-hint');
+        if (hint) hint.remove();
+        loadListPage();
+      }
+    }, { passive: true });
+    // 顶部区域（搜索栏+面包屑）直接下滑刷新，不影响文件列表正常滑动
+    var ptrStartY = 0, ptrPulling = false, ptrDist = 0;
+    var PTR_THRESHOLD = 60;
+    var ptrZone = document.getElementById('search-bar');
+    if (!ptrZone) ptrZone = $('breadcrumb');
+    if (ptrZone) {
+      ptrZone.addEventListener('touchstart', function (e) {
+        if (state.view !== 'files') return;
+        ptrStartY = e.touches[0].clientY;
+        ptrPulling = true;
+        ptrDist = 0;
+      }, { passive: true });
+      ptrZone.addEventListener('touchmove', function (e) {
+        if (!ptrPulling) return;
+        ptrDist = e.touches[0].clientY - ptrStartY;
+        if (ptrDist > 0) {
+          var ptr = $('ptr-indicator');
+          if (ptr) {
+            ptr.style.opacity = Math.min(1, ptrDist / PTR_THRESHOLD);
+            ptr.style.transform = 'translateY(' + Math.min(ptrDist, 100) + 'px)';
+          }
+        }
+      }, { passive: true });
+      ptrZone.addEventListener('touchend', function (e) {
+        if (!ptrPulling) return;
+        ptrPulling = false;
+        var ptr = $('ptr-indicator');
+        if (ptr) {
+          if (ptrDist > PTR_THRESHOLD) {
+            ptr.textContent = '刷新中...';
+            loadList();
+            setTimeout(function () {
+              ptr.style.opacity = 0;
+              ptr.style.transform = 'translateY(0)';
+              ptr.textContent = '下拉刷新';
+            }, 800);
+          } else {
+            ptr.style.opacity = 0;
+            ptr.style.transform = 'translateY(0)';
+            ptr.textContent = '下拉刷新';
+          }
+        }
+        ptrDist = 0;
+      }, { passive: true });
+    }
+  }
+
+  function renderListAppend(list) {
+    var box = $('file-list');
+    if (!list || !list.length) return;
+    var isSelect = state.selectMode;
+    var ckIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    list.forEach(function (item) {
+      _currentList.push(item);
+      var isSel = !!state.selectedMap[item.FileId];
+      var card = document.createElement('div');
+      card.className = 'file-card' + (isSel ? ' selected' : '');
+      card.setAttribute('data-fid', item.FileId);
+      if (isSelect) {
+        var ck = document.createElement('div');
+        ck.className = 'file-check' + (isSel ? ' checked' : '');
+        if (isSel) ck.innerHTML = ckIcon;
+        card.appendChild(ck);
+      }
+      var iconWrap = document.createElement('div');
+      iconWrap.className = 'file-icon-wrap fi-' + iconFor(item);
+      iconWrap.appendChild(makeIcon(iconFor(item), 'file-icon'));
+      var body = document.createElement('div'); body.className = 'file-body';
+      var name = document.createElement('div'); name.className = 'file-name'; name.textContent = item.FileName || '未命名';
+      var meta = document.createElement('div'); meta.className = 'file-meta';
+      meta.textContent = item.Type === 1
+        ? fmtTime(pickTime(item))
+        : (fmtTime(pickTime(item)) + ' · ' + fmtSize(item.Size));
+      body.appendChild(name); body.appendChild(meta);
+      card.appendChild(iconWrap); card.appendChild(body);
+      card.addEventListener('click', function (e) {
+        if (state.selectMode) { toggleSelect(item); }
+        else if (item.Type === 1) { openDir(item); }
+        else { openActionSheet(item); }
+      });
+      card.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        if (!state.selectMode) openActionSheet(item);
+      });
+      box.appendChild(card);
+    });
+    if (isSelect) refreshSelectBar();
   }
 
   function renderList(list, total) {
@@ -984,7 +1136,9 @@
       var body = document.createElement('div'); body.className = 'file-body';
       var name = document.createElement('div'); name.className = 'file-name'; name.textContent = item.FileName || '未命名';
       var meta = document.createElement('div'); meta.className = 'file-meta';
-      meta.textContent = item.Type === 1 ? '文件夹' : (fmtSize(item.Size) + ' · ' + (item.ModifyTime || ''));
+      meta.textContent = item.Type === 1
+        ? fmtTime(pickTime(item))
+        : (fmtTime(pickTime(item)) + ' · ' + fmtSize(item.Size));
       body.appendChild(name); body.appendChild(meta);
       // 快捷方式按钮已移除：文件/文件夹的下载、删除等操作统一点击卡片后经操作浮层执行
       card.appendChild(iconWrap); card.appendChild(body);
@@ -1985,14 +2139,11 @@
     $('sheet-title').textContent = item.FileName || '未命名';
     var grid = $('sheet-grid');
     grid.innerHTML = '';
-    // 点击菜单项按类型区分：
-    //   - 文件夹 (Type===1)：打开 / 分享 / 重命名 / 删除
-    //   - 文件   (Type!==1)：预览 / 下载 / 分享 / 重命名 / 删除
-    var isDir = item.Type === 1;
     var items;
-    if (isDir) {
+    if (item.Type === 1) {
       items = [
         { icon: 'open', label: '打开', cls: 'primary', fn: function () { closeSheet(); openDir(item); } },
+        { icon: 'download', label: '下载', cls: '', fn: function () { closeSheet(); doDownload(item); } },
         { icon: 'share', label: '分享', cls: '', fn: function () { closeSheet(); doShare(item); } },
         { icon: 'detail', label: '详细信息', cls: '', fn: function () { closeSheet(); showFileDetail(item); } },
         { icon: 'folder-move', label: '移动', cls: '', fn: function () { closeSheet(); pickTargetAndMove(item, 'move'); } },
@@ -2001,8 +2152,11 @@
         { icon: 'trash', label: '删除', cls: 'warn', fn: function () { closeSheet(); onAction('delete', item); } }
       ];
     } else {
+      var ext = (item.FileName || '').split('.').pop().toLowerCase();
+      var isMedia = ['mp4','mkv','avi','mov','rmvb','flv','wmv','webm','ts','mp3','wav','flac','aac','ogg','m4a','ape'].indexOf(ext) >= 0;
+      var previewLabel = isMedia ? '播放' : '预览';
       items = [
-        { icon: 'open', label: '预览', cls: 'primary', fn: function () { closeSheet(); openPreview(item); } },
+        { icon: 'open', label: previewLabel, cls: 'primary', fn: function () { closeSheet(); openPreview(item); } },
         { icon: 'download', label: '下载', cls: '', fn: function () { closeSheet(); doDownload(item); } },
         { icon: 'share', label: '分享', cls: '', fn: function () { closeSheet(); doShare(item); } },
         { icon: 'detail', label: '详细信息', cls: '', fn: function () { closeSheet(); showFileDetail(item); } },
@@ -2075,7 +2229,7 @@
   // 详细信息弹窗
   function showFileDetail(item) {
     var size = item.Size || item.size || 0;
-    var t = item.UpdateTime || item.ModTime || item.Time || '';
+    var t = fmtTime(pickTime(item));
     var html = '<div style="padding:8px 0;line-height:2;">'
       + '<div><b>名称：</b>' + esc(item.FileName || item.name || '') + '</div>'
       + '<div><b>类型：</b>' + (item.Type === 1 ? '文件夹' : '文件') + '</div>'
@@ -2253,6 +2407,8 @@
       var link = pickDownloadUrl(d);
       if (link) {
         var fname = item.FileName || item.fileName || (Date.now() + '');
+        // 文件夹批量下载返回的是 zip 包，确保文件名带 .zip 后缀
+        if (item.Type === 1 && !/\.zip$/i.test(fname)) fname = fname + '.zip';
         var fsize = Number(item.Size) || Number(item.size) || Number(item.FileSize) || 0;
         var started = false;
         var genId = -1;
@@ -2287,9 +2443,10 @@
     image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico'],
     audio: ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'opus', 'amr'],
     video: ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', '3gp'],
-    text: ['txt', 'md', 'json', 'xml', 'log', 'csv', 'ini', 'conf', 'yml', 'yaml', 'js', 'css', 'html', 'htm',
+    text: ['txt', 'md', 'json', 'xml', 'log', 'csv', 'ini', 'conf', 'yml', 'yaml', 'js', 'css',
       'java', 'kt', 'py', 'go', 'rs', 'c', 'cpp', 'h', 'sh', 'bat', 'sql', 'ts', 'php', 'rb', 'swift',
       'toml', 'properties', 'gradle', 'srt', 'ass'],
+    html: ['html', 'htm'],
     docx: ['docx'],
     xlsx: ['xlsx', 'xls'],
     pdf: ['pdf']
@@ -2386,6 +2543,8 @@
       renderPreviewMedia(pv, purl);
     } else if (pv.kind === 'text') {
       renderPreviewText(pv);
+    } else if (pv.kind === 'html') {
+      renderPreviewHtml(pv);
     } else if (pv.kind === 'pdf') {
       renderPreviewPdf(pv);
     } else if (pv.kind === 'docx') {
@@ -2422,6 +2581,37 @@
       vd.onerror = function () { renderPreviewFallback('视频加载失败或格式不受支持', '预览失败'); };
       vd.src = purl;
     }
+  }
+  function renderPreviewHtml(pv) {
+    var box = pvBody();
+    if (!box) return;
+    var purl = (bridge && bridge.getPreviewUrl) ? bridge.getPreviewUrl(pv.link) : pv.link;
+    if (!purl) { renderPreviewFallback('本地预览服务未就绪', '预览失败'); return; }
+    box.innerHTML = '<div class="pv-html-toolbar">'
+      + '<button class="pv-html-btn" id="pv-html-view">网页视图</button>'
+      + '<button class="pv-html-btn" id="pv-html-src">源码视图</button>'
+      + '</div>'
+      + '<div class="pv-html-wrap" id="pv-html-wrap">'
+      + '<iframe id="pv-html-frame" sandbox="allow-scripts allow-same-origin allow-forms" style="width:100%;height:100%;border:none;background:#fff;"></iframe>'
+      + '<pre id="pv-html-pre" style="display:none;width:100%;height:100%;overflow:auto;padding:12px;margin:0;font-size:13px;background:#1e1e1e;color:#d4d4d4;white-space:pre-wrap;"></pre>'
+      + '</div>';
+    $('pv-html-frame').src = purl;
+    $('pv-html-view').addEventListener('click', function () {
+      $('pv-html-frame').style.display = '';
+      $('pv-html-pre').style.display = 'none';
+    });
+    $('pv-html-src').addEventListener('click', function () {
+      $('pv-html-frame').style.display = 'none';
+      $('pv-html-pre').style.display = '';
+      if (!$('pv-html-pre').textContent && bridge && bridge.fetchText) {
+        renderPreviewLoading('正在加载源码...');
+        window.__onFetchText = function (url, ok, text) {
+          hide($('pv-ld'));
+          $('pv-html-pre').textContent = ok ? (text || '') : '加载失败';
+        };
+        bridge.fetchText(pv.link);
+      }
+    });
   }
   function renderPreviewText(pv) {
     renderPreviewLoading('正在加载文本...');
@@ -3127,7 +3317,7 @@
       var name = it.shareName || it.ShareName || '未命名分享';
       var exp = it.expiration || it.Expiration || '';
       var status = (it.shareStatus === undefined || it.shareStatus === 0 || it.shareStatus === '0') ? '' : '已失效';
-      var sub = (exp ? ('有效期至 ' + exp) : '永久有效') + (status ? (' · ' + status) : '');
+      var sub = (exp ? ('有效期至 ' + fmtTime(exp)) : '永久有效') + (status ? (' · ' + status) : '');
       html += '<div class="share-item">'
         + '<div class="share-item-info">'
         + '<div class="share-item-name">' + esc(name) + '</div>'
@@ -4168,6 +4358,7 @@
       });
     });
     // 初始：检查登录态
+    setupListScroll();
     var t = loadToken();
     if (t) {
       state.token = t;
