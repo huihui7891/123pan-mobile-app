@@ -1051,11 +1051,118 @@
     if (cnt) cnt.textContent = '已选 ' + n + ' 项';
     var mv = $('select-move');
     if (mv) mv.classList.toggle('disabled', n === 0);
+    var cp = $('select-copy');
+    if (cp) cp.classList.toggle('disabled', n === 0);
     var del = $('select-delete');
     if (del) del.classList.toggle('disabled', n === 0);
   }
 
   // ---------- 文件夹选择器（移动目标） ----------
+  // 递归复制文件夹：创建同名文件夹 → 遍历内容 → 逐个复制 → 子文件夹递归
+  // onDone 回调：当前文件夹（含所有子内容）复制完成后调用
+  var _copyStats = { files: 0, dirs: 0 };
+  function copyFolderRecursive(srcDir, targetParentId, onDone) {
+    // 1. 在目标目录创建同名文件夹
+    var mkdirBody = JSON.stringify({
+      parentFileId: targetParentId,
+      filename: srcDir.FileName || '未命名',
+      dirPath: '',
+      type: 1,
+      etag: '',
+      size: 0,
+      conflictPolicy: 1
+    });
+    api('POST', API.mkdir, mkdirBody, true, function (d) {
+      if (!d || d.code !== 0) {
+        toast('创建文件夹失败: ' + ((d && d.message) || ''));
+        if (onDone) onDone();
+        return;
+      }
+      var newDirId = (d.data && ((d.data.Info && (d.data.Info.FileId || d.data.Info.fileId)) || d.data.FileId || d.data.fileId)) || 0;
+      if (!newDirId) { toast('创建文件夹失败：未返回ID'); if (onDone) onDone(); return; }
+      _copyStats.dirs++;
+      // 2. 列出源文件夹内容（分页拉取全部）
+      listAllFiles(srcDir.FileId, function (list) {
+        if (!list || !list.length) {
+          if (onDone) onDone();
+          return;
+        }
+        var idx = 0;
+        function nextItem() {
+          if (idx >= list.length) { if (onDone) onDone(); return; }
+          var item = list[idx++];
+          if (item.Type === 1) {
+            // 子文件夹：递归，完成后再下一个
+            copyFolderRecursive(item, newDirId, function () {
+              setTimeout(nextItem, 300);
+            });
+          } else {
+            // 文件：复制到新文件夹
+            var body = { targetFileId: newDirId, fileList: [{ fileId: Number(item.FileId), fileName: item.FileName || '' }] };
+            shareApi('POST', '/b/api/restful/goapi/v1/file/copy/async', JSON.stringify(body), false, function (cd) {
+              _copyStats.files++;
+              if (cd && cd.code === 0) {
+                if (_copyStats.files % 10 === 0) toast('已复制 ' + _copyStats.files + ' 个文件，' + _copyStats.dirs + ' 个文件夹');
+              } else {
+                toast('复制文件「' + (item.FileName||'') + '」失败');
+              }
+              setTimeout(nextItem, 300);
+            });
+          }
+        }
+        nextItem();
+      });
+    });
+  }
+  // 分页拉取文件夹下所有文件（超过200条自动翻页）
+  function listAllFiles(parentFileId, cb, nextPage) {
+    nextPage = nextPage || 0;
+    api('GET', API.list + '?driveId=0&limit=200&next=' + nextPage + '&orderBy=file_id&orderDirection=desc&parentFileId=' + parentFileId + '&trashed=false&Page=1&OnlyLookAbnormalFile=0', '', true, function (ld) {
+      var list = (ld && ld.data && (ld.data.InfoList || ld.data.infoList)) || [];
+      var next = (ld && ld.data && (ld.data.Next || ld.data.next)) || 0;
+      if (next > 0) {
+        listAllFiles(parentFileId, function (more) { cb(list.concat(more)); }, next);
+      } else {
+        cb(list);
+      }
+    });
+  }
+
+  // 轮询复制任务状态
+  function pollCopyTask(taskId) {
+    var attempts = 0;
+    var maxAttempts = 60; // 最多轮询5分钟（5秒一次）
+    function check() {
+      if (attempts++ >= maxAttempts) { toast('复制任务已提交，请稍后在目标目录查看'); return; }
+      shareApi('GET', '/b/api/restful/goapi/v1/file/copy/task?taskId=' + taskId, '', false, function (d) {
+        if (d && d.code === 0) {
+          var status = d.data && d.data.status;
+          // status: 0=进行中, 1=成功, 2=失败
+          if (status === 1) {
+            toast('复制完成');
+            if (state.view === 'files') loadList();
+          } else if (status === 2) {
+            toast('复制失败: ' + ((d.data && d.data.reason) || '未知错误'));
+          } else {
+            setTimeout(check, 5000);
+          }
+        } else {
+          setTimeout(check, 5000);
+        }
+      });
+    }
+    setTimeout(check, 3000);
+  }
+
+  // 单个文件移动/复制：把当前 item 放入 selectedMap，然后打开目录选择器
+  function pickTargetAndMove(item, action) {
+    state.selectedMap = {};
+    state.selectedMap[item.FileId] = item;
+    state.pickerAction = action; // 'move' or 'copy'
+    state.pickerState = { dir: 0, path: [] };
+    show($('move-picker'));
+    loadPickerDir(0, []);
+  }
   // 打开移动选择面板：从根目录开始浏览目录以选择目标文件夹
   function openMovePicker() {
     if (Object.keys(state.selectedMap).length === 0) { toast('请先选择要移动的文件'); return; }
@@ -1134,23 +1241,93 @@
     var p = state.pickerState;
     if (!p) return;
     var targetId = Number(p.dir) || 0;
-    // 拦截：目标不能是任一选中文件夹自身或其子目录
-    var paths = p.path || [];
-    for (var k in state.selectedMap) {
-      var it = state.selectedMap[k];
-      var itId = Number(it.FileId);
-      if (it.Type === 1 && itId === targetId) {
-        toast('不能移动到自身所在文件夹'); return;
-      }
-      // 检查 target 是否为选中的文件夹子目录（当前选择路径中已包含该文件夹）
-      var inSel = paths.some(function (c) { return Number(c.id) === itId; });
-      if (it.Type === 1 && inSel) {
-        toast('不能移动到所选文件夹的子目录'); return;
+    var action = state.pickerAction || 'move';
+    // 拦截：目标不能是任一选中文件夹自身或其子目录（仅移动时拦截，复制不拦截）
+    if (action === 'move') {
+      var paths = p.path || [];
+      for (var k in state.selectedMap) {
+        var it = state.selectedMap[k];
+        var itId = Number(it.FileId);
+        if (it.Type === 1 && itId === targetId) {
+          toast('不能移动到自身所在文件夹'); return;
+        }
+        var inSel = paths.some(function (c) { return Number(c.id) === itId; });
+        if (it.Type === 1 && inSel) {
+          toast('不能移动到所选文件夹的子目录'); return;
+        }
       }
     }
-    // 移动请求体：123pan 原生协议 mod_pid -> {parentFileId 目标, fileIdList:[{FileId: id}]}
+    // 移动或复制请求
     var ids = [];
     for (var kk in state.selectedMap) ids.push(Number(state.selectedMap[kk].FileId) || 0);
+    if (action === 'copy') {
+      // 复制：调 copy/async（走分享域名容灾）
+      var copyItems = [];
+      var hasFolder = false;
+      var sourceFolder = null;
+      for (var kk2 in state.selectedMap) {
+        var it2 = state.selectedMap[kk2];
+        if (it2.Type === 1) { hasFolder = true; sourceFolder = it2; }
+        copyItems.push({
+          fileId: Number(it2.FileId),
+          fileName: it2.FileName || ''
+        });
+      }
+      if (hasFolder) {
+        // 有文件夹：逐个递归复制，全部完成后再复制文件
+        var folders = [];
+        var files = [];
+        for (var kk3 in state.selectedMap) {
+          var it3 = state.selectedMap[kk3];
+          if (it3.Type === 1) folders.push(it3);
+          else files.push({ fileId: Number(it3.FileId), fileName: it3.FileName || '' });
+        }
+        closeMovePicker();
+        exitSelectMode();
+        _copyStats = { files: 0, dirs: 0 };
+        toast('开始复制 ' + folders.length + ' 个文件夹，' + files.length + ' 个文件...');
+        var fi = 0;
+        function nextFolder() {
+          if (fi >= folders.length) {
+            // 所有文件夹复制完，复制文件
+            if (files.length) {
+              var body2 = { targetFileId: targetId, fileList: files };
+              shareApi('POST', '/b/api/restful/goapi/v1/file/copy/async', JSON.stringify(body2), false, function (d2) {
+                if (d2 && d2.code === 0) toast('已复制 ' + files.length + ' 个文件');
+                else toast('部分文件复制失败');
+                toast('复制完成：共 ' + _copyStats.files + ' 个文件，' + _copyStats.dirs + ' 个文件夹');
+                loadList();
+              });
+            } else {
+              toast('复制完成：共 ' + _copyStats.files + ' 个文件，' + _copyStats.dirs + ' 个文件夹');
+              loadList();
+            }
+            return;
+          }
+          var cur = folders[fi++];
+          copyFolderRecursive(cur, targetId, function () {
+            setTimeout(nextFolder, 500);
+          });
+        }
+        nextFolder();
+        return;
+      }
+      var copyBody = { targetFileId: targetId, fileList: copyItems };
+      shareApi('POST', '/b/api/restful/goapi/v1/file/copy/async', JSON.stringify(copyBody), false, function (d) {
+        if (d && d.code === 0) {
+          closeMovePicker();
+          exitSelectMode();
+          var taskId = d.data && d.data.taskId;
+          toast('已提交复制任务，正在后台复制...');
+          loadList();
+          if (taskId) pollCopyTask(taskId);
+        } else {
+          toast((d && d.message) || '复制失败');
+        }
+      });
+      return;
+    }
+    // 移动请求体：123pan 原生协议 mod_pid -> {parentFileId 目标, fileIdList:[{FileId: id}]}
     var fileIdList = ids.map(function (fid) { return { FileId: fid }; });
     var body = { parentFileId: targetId, fileIdList: fileIdList };
     api('POST', API.move, JSON.stringify(body), true, function (d) {
@@ -1801,6 +1978,8 @@
         { icon: 'open', label: '打开', cls: 'primary', fn: function () { closeSheet(); openDir(item); } },
         { icon: 'share', label: '分享', cls: '', fn: function () { closeSheet(); doShare(item); } },
         { icon: 'detail', label: '详细信息', cls: '', fn: function () { closeSheet(); showFileDetail(item); } },
+        { icon: 'folder-move', label: '移动', cls: '', fn: function () { closeSheet(); pickTargetAndMove(item, 'move'); } },
+        { icon: 'copy', label: '复制', cls: '', fn: function () { closeSheet(); pickTargetAndMove(item, 'copy'); } },
         { icon: 'rename', label: '重命名', cls: '', fn: function () { closeSheet(); onAction('rename', item); } },
         { icon: 'trash', label: '删除', cls: 'warn', fn: function () { closeSheet(); onAction('delete', item); } }
       ];
@@ -1810,6 +1989,8 @@
         { icon: 'download', label: '下载', cls: '', fn: function () { closeSheet(); doDownload(item); } },
         { icon: 'share', label: '分享', cls: '', fn: function () { closeSheet(); doShare(item); } },
         { icon: 'detail', label: '详细信息', cls: '', fn: function () { closeSheet(); showFileDetail(item); } },
+        { icon: 'folder-move', label: '移动', cls: '', fn: function () { closeSheet(); pickTargetAndMove(item, 'move'); } },
+        { icon: 'copy', label: '复制', cls: '', fn: function () { closeSheet(); pickTargetAndMove(item, 'copy'); } },
         { icon: 'rename', label: '重命名', cls: '', fn: function () { closeSheet(); onAction('rename', item); } },
         { icon: 'trash', label: '删除', cls: 'warn', fn: function () { closeSheet(); onAction('delete', item); } }
       ];
@@ -3843,6 +4024,12 @@
     $('select-cancel').addEventListener('click', exitSelectMode);
     $('select-delete').addEventListener('click', deleteSelected);
     $('select-move').addEventListener('click', openMovePicker);
+    $('select-copy').addEventListener('click', function () {
+      state.pickerAction = 'copy';
+      state.pickerState = { dir: 0, path: [] };
+      show($('move-picker'));
+      loadPickerDir(0, []);
+    });
     // 移动文件夹选择器：取消 / 确定移动
     $('picker-cancel').addEventListener('click', closeMovePicker);
     $('picker-confirm').addEventListener('click', confirmMove);
