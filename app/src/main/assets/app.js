@@ -2898,9 +2898,13 @@
       doShareDirect(item);
       return;
     }
-    // sharePwd：随机(1)时留空由服务端生成；无提取码(2)时留空；自定义(3)时用用户输入
+    // sharePwd：随机(1)时自动生成4位随机码；无提取码(2)时留空；自定义(3)时用用户输入
     var sharePwd = '';
-    if (pwdType === '3') {
+    if (pwdType === '1') {
+      // 随机提取码：前端自动生成4位随机码，按自定义模式提交
+      var chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      for (var i = 0; i < 4; i++) sharePwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    } else if (pwdType === '3') {
       sharePwd = ($('sc-pwd-input') && $('sc-pwd-input').value || '').trim().toUpperCase();
       if (!/^[A-Z0-9]{4}$/.test(sharePwd)) { toast('请输入4位提取码（字母/数字）'); return; }
     }
@@ -2914,7 +2918,7 @@
       event: 'shareCreate',
       fileNum: 1,
       renameVisible: false,
-      shareTypeValue: Number(pwdType),           // 1=随机提取码 2=无提取码 3=自定义提取码
+      shareTypeValue: Number(pwdType === '1' ? 3 : pwdType),           // 随机模式改按自定义提交
       shareModality: Number(expireVal),          // 1=1天 2=7天 3=30天 4=永久
       operatePlace: 1,
       trafficSwitch: true
@@ -2926,17 +2930,15 @@
         return;
       }
       var dt = d.data;
-      // ShareKey 形如 "key-pwd"（- 后为提取码，可能为空）
+      // 随机/自定义提取码：sharePwd就是提取码
       var shareKey = dt.ShareKey || '';
-      var key = shareKey, pwd = '';
-      var dash = shareKey.indexOf('-');
-      if (dash >= 0) { key = shareKey.slice(0, dash); pwd = shareKey.slice(dash + 1); }
+      var key = shareKey, pwd = sharePwd || '';
       // 官方标准分享访问链接，若提供了 shareLinkList（实际可用域名）则优先
       var link = 'https://www.123pan.com/s/' + key;
       var sl = dt.shareLinkList;
       if (sl && sl.list && sl.list.length) { link = sl.list[0]; }
       else if (sl && sl.standBy) { link = sl.standBy; }
-      // 无提取码(shareTypeValue=2)或接口未返回提取码后缀时，不显示提取码
+      // 无提取码(shareTypeValue=2)时不显示提取码
       var showPwd = !(pwdType === '2') && pwd;
       showShareModal(item.FileName || '分享', link, showPwd ? pwd : '');
     });
@@ -2960,15 +2962,20 @@
   function doCopyLink() {
     var link = $('share-link') && $('share-link').value;
     if (!link) { toast('无可复制链接'); return; }
+    var pwdEl = $('share-pwd');
+    var pwd = pwdEl ? String(pwdEl.textContent || '').trim() : '';
+    if (pwd && link.indexOf('pwd=') < 0) {
+      link += (link.indexOf('?') >= 0 ? '&' : '?') + 'pwd=' + pwd;
+    }
     function fallback() {
       var ta = document.createElement('textarea');
       ta.value = link; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); toast('链接已复制'); } catch (e) { toast('复制失败，请手动复制'); }
+      try { document.execCommand('copy'); toast(pwd ? '链接已复制（含提取码）' : '链接已复制'); } catch (e) { toast('复制失败，请手动复制'); }
       document.body.removeChild(ta);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(function () { toast('链接已复制'); },
+      navigator.clipboard.writeText(link).then(function () { toast(pwd ? '链接已复制（含提取码）' : '链接已复制'); },
         function () { fallback(); });
     } else { fallback(); }
   }
@@ -3389,8 +3396,8 @@
     var key = '', pwd = '', m, fromUrl = false;
     m = input.match(/[?&#](?:pwd|Pwd|p)=([A-Za-z0-9]{1,16})/);
     if (m) pwd = m[1];
-    // 支持旧格式 /s/KEY 和新格式 /123/KEY
-    m = input.match(/\/(?:s|123)\/([A-Za-z0-9_-]+)/);
+    // 支持旧格式 /s/KEY、新格式 /123/KEY、/123pan/KEY
+    m = input.match(/\/(?:s|123|123pan)\/([A-Za-z0-9_-]+)/);
     if (m) { key = m[1]; fromUrl = true; }
     else {
       m = input.match(/([A-Za-z0-9]{4,})(?:-([A-Za-z0-9]{1,16}))?$/);
@@ -3467,15 +3474,36 @@
     if (!dlState.list.length) { box.innerHTML = '<div class="p-empty">分享中无文件</div>'; return; }
     box.innerHTML = '';
     dlState.list.forEach(function (it) {
-      if (it.Type === 1) return; // 文件夹跳过，只列文件
+      var isDir = (it.Type === 1);
       var row = document.createElement('div');
       row.className = 'rc-row';
-      row.innerHTML = '<div class="rc-ic" style="color:var(--accent)"><span class="file-icon" data-icon="file"></span></div>'
+      var iconCls = isDir ? 'folder' : 'file';
+      row.innerHTML = '<div class="rc-ic" style="color:var(--accent)"><span class="file-icon" data-icon="' + iconCls + '"></span></div>'
         + '<div class="rc-info"><div class="rc-name">' + esc(it.FileName || '') + '</div>'
-        + '<div class="rc-meta">' + fmtSize(it.Size || it.FileSize || 0) + '</div></div>'
+        + '<div class="rc-meta">' + (isDir ? '文件夹' : fmtSize(it.Size || it.FileSize || 0)) + '</div></div>'
         + '<div class="rc-enter">›</div>';
-      row.addEventListener('click', function () { getDirectUrl(it); });
+      row.addEventListener('click', function () {
+        if (isDir) loadDlDir(it.FileId || it.fileId);
+        else getDirectUrl(it);
+      });
       box.appendChild(row);
+    });
+    injectIcons(box);
+  }
+  function loadDlDir(parentId) {
+    var box = $('dl-list');
+    if (box) box.innerHTML = '<div class="loading-dot">加载中...</div>';
+    var path = '/b/api/share/get?ShareKey=' + encodeURIComponent(dlState.key)
+      + '&SharePwd=' + encodeURIComponent(dlState.pwd)
+      + '&parentFileId=' + encodeURIComponent(parentId)
+      + '&Page=1&limit=200&next=0&orderBy=file_name&orderDirection=asc&event=homeListFile';
+    shareApi('GET', path, '', true, function (d) {
+      if (d && d.code === 0 && d.data) {
+        dlState.list = d.data.InfoList || [];
+        renderDlList();
+      } else {
+        if (box) box.innerHTML = '<div class="p-empty">加载失败：' + esc((d && d.message) || '') + '</div>';
+      }
     });
   }
   function getDirectUrl(it) {
