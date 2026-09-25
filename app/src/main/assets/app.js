@@ -125,7 +125,8 @@
     dupScanning: false,      // 是否正在全盘扫描
     dupScanned: 0,           // 已扫描文件数
     orderBy: (_sortPref && _sortPref.by) || 'file_id',       // 列表排序字段（file_name/file_size/updated_at/file_id）
-    orderDirection: (_sortPref && _sortPref.dir) || 'desc'   // 排序方向 asc/desc
+    orderDirection: (_sortPref && _sortPref.dir) || 'desc',  // 排序方向 asc/desc
+    viewMode: (function () { try { return localStorage.getItem('pan_view') || 'list'; } catch (e) { return 'list'; } })(),
   };
 
   var API = {
@@ -926,6 +927,9 @@
     });
     document.querySelectorAll('#sort-dir .sd-btn').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('data-dir') === state.orderDirection);
+    });
+    document.querySelectorAll('#view-mode .sd-btn').forEach(function (el) {
+      el.classList.toggle('active', el.getAttribute('data-view') === (state.viewMode || 'list'));
     });
   }
   function openSortSheet() {
@@ -3337,18 +3341,21 @@
       var it = list[i]; if (!it) return;
       var act = t.getAttribute('data-act');
       if (act === 'copy') {
-        var url = it.shareUrl || it.ShareUrl || '';
-        var key = it.shareKey || it.ShareKey || '';
-        var pwd = it.sharePwd || it.SharePwd || '';
-        if (!url && key) {
-          var dash = key.indexOf('-');
-          var k = dash >= 0 ? key.slice(0, dash) : key;
-          if (!pwd && dash >= 0) pwd = key.slice(dash + 1);
-          url = 'https://www.123pan.com/s/' + k;
+        var key = it.ShareKey || it.shareKey || it.Key || it.key || '';
+        var pwd = it.SharePwd || it.sharePwd || '';
+        var url = '';
+        // 优先从 shareLinkList 取真实分享域名链接
+        if (it.shareLinkList && Array.isArray(it.shareLinkList) && it.shareLinkList.length) {
+          url = it.shareLinkList[0] || '';
         }
-        if (pwd) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'pwd=' + pwd;
+        if (!url) url = it.ShareUrl || it.shareUrl || it.ShareLink || it.shareLink || '';
+        if (!url && key) url = 'https://www.123pan.com/s/' + key;
+        if (url && pwd && url.indexOf('pwd=') < 0) {
+          url += (url.indexOf('?') >= 0 ? '&' : '?') + 'pwd=' + pwd;
+        }
         if (!url) { toast('该分享无可用链接'); return; }
         copyText(url, '分享链接已复制');
+        setTimeout(function () { toast('链接: ' + url); }, 300);
       } else if (act === 'cancel') {
         doCancelShare(it);
       }
@@ -3379,18 +3386,22 @@
   function parseShareKey(input) {
     input = String(input || '').trim();
     if (!input) return null;
-    var key = '', pwd = '', m;
+    var key = '', pwd = '', m, fromUrl = false;
     m = input.match(/[?&#](?:pwd|Pwd|p)=([A-Za-z0-9]{1,16})/);
     if (m) pwd = m[1];
-    m = input.match(/\/s\/([A-Za-z0-9_-]+)/);
-    if (m) { key = m[1]; }
+    // 支持旧格式 /s/KEY 和新格式 /123/KEY
+    m = input.match(/\/(?:s|123)\/([A-Za-z0-9_-]+)/);
+    if (m) { key = m[1]; fromUrl = true; }
     else {
-      m = input.match(/^([A-Za-z0-9]{4,})(?:-([A-Za-z0-9]{1,16}))?$/);
+      m = input.match(/([A-Za-z0-9]{4,})(?:-([A-Za-z0-9]{1,16}))?$/);
       if (m) { key = m[1]; if (m[2] && !pwd) pwd = m[2]; }
     }
     if (!key) return null;
-    var dash = key.indexOf('-');
-    if (dash >= 0) { if (!pwd) pwd = key.slice(dash + 1); key = key.slice(0, dash); }
+    // 只有纯输入（非URL匹配）才拆分 - 作为提取码；URL匹配到的key完整保留
+    if (!fromUrl) {
+      var dash = key.indexOf('-');
+      if (dash >= 0) { if (!pwd) pwd = key.slice(dash + 1); key = key.slice(0, dash); }
+    }
     return { key: key, pwd: pwd };
   }
   function openReceiveShare() {
@@ -3418,6 +3429,98 @@
     shareState.stack = [];
     shareState.sel = {};
     loadShareDir('0', 1);
+  }
+  // ---- 直链解析 ----
+  var dlState = { key: '', pwd: '', list: [] };
+  function openDirectLink() {
+    dlState.key = ''; dlState.list = [];
+    var box = $('dl-list');
+    if (box) box.innerHTML = '';
+    show($('page-directlink'));
+  }
+  function doOpenDirectLink() {
+    var parsed = parseShareKey($('dl-link') ? $('dl-link').value : '');
+    if (!parsed || !parsed.key) { toast('请输入有效的分享链接或分享码'); return; }
+    dlState.key = parsed.key;
+    var manualPwd = $('dl-pwd') ? String($('dl-pwd').value || '').trim() : '';
+    dlState.pwd = manualPwd || parsed.pwd || '';
+    loadDlList();
+  }
+  function loadDlList() {
+    var box = $('dl-list');
+    if (box) box.innerHTML = '<div class="loading-dot">加载中...</div>';
+    var path = '/b/api/share/get?ShareKey=' + encodeURIComponent(dlState.key)
+      + '&SharePwd=' + encodeURIComponent(dlState.pwd)
+      + '&parentFileId=0&Page=1&limit=200&next=0&orderBy=file_name&orderDirection=asc&event=homeListFile';
+    shareApi('GET', path, '', true, function (d) {
+      if (d && d.code === 0 && d.data) {
+        dlState.list = d.data.InfoList || [];
+        renderDlList();
+      } else {
+        if (box) box.innerHTML = '<div class="p-empty">解析失败：' + esc((d && d.message) || '分享不存在或提取码错误') + '</div>';
+      }
+    });
+  }
+  function renderDlList() {
+    var box = $('dl-list');
+    if (!box) return;
+    if (!dlState.list.length) { box.innerHTML = '<div class="p-empty">分享中无文件</div>'; return; }
+    box.innerHTML = '';
+    dlState.list.forEach(function (it) {
+      if (it.Type === 1) return; // 文件夹跳过，只列文件
+      var row = document.createElement('div');
+      row.className = 'rc-row';
+      row.innerHTML = '<div class="rc-ic" style="color:var(--accent)"><span class="file-icon" data-icon="file"></span></div>'
+        + '<div class="rc-info"><div class="rc-name">' + esc(it.FileName || '') + '</div>'
+        + '<div class="rc-meta">' + fmtSize(it.Size || it.FileSize || 0) + '</div></div>'
+        + '<div class="rc-enter">›</div>';
+      row.addEventListener('click', function () { getDirectUrl(it); });
+      box.appendChild(row);
+    });
+  }
+  function getDirectUrl(it) {
+    var box = $('dl-list');
+    if (box) box.innerHTML = '<div class="loading-dot">正在获取直链...</div>';
+    var sz = Number(it.Size) || Number(it.FileSize) || Number(it.size) || 0;
+    var body = JSON.stringify({
+      ShareKey: dlState.key,
+      SharePwd: dlState.pwd,
+      FileId: it.FileId || it.fileId,
+      S3KeyFlag: it.S3KeyFlag || it.s3KeyFlag || '',
+      Etag: it.Etag || it.etag || '',
+      FileName: it.FileName || it.fileName || '',
+      FileNameType: it.Type !== undefined ? it.Type : 0,
+      Size: sz,
+      size: sz,
+      driveId: 0,
+      type: 'download'
+    });
+    shareApi('POST', '/b/api/share/download/info', body, true, function (d) {
+      loadDlList();
+      if (d && d.code === 0 && d.data) {
+        var url = d.data.DownloadUrl || d.data.downloadUrl || d.data.DownloadURL || d.data.url || '';
+        if (!url) { toast('未获取到直链地址'); return; }
+        $('dl-filename').textContent = it.FileName || it.fileName || '';
+        $('dl-url-box').textContent = url;
+        showDlQR(url);
+        show($('dl-result-modal'));
+      } else {
+        toast((d && d.message) || '获取直链失败，可能该文件不支持分享下载');
+      }
+    });
+  }
+  function showDlQR(text) {
+    var wrap = $('dl-qr-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    // 用在线二维码API生成HTTP URL图片，方便直接下载
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=' + encodeURIComponent(text);
+    var img = document.createElement('img');
+    img.src = qrUrl;
+    img.style.cssText = 'width:180px;height:180px;';
+    wrap.appendChild(img);
+    // 保存当前QR URL供下载用
+    wrap.dataset.qrUrl = qrUrl;
   }
   function loadShareDir(parentId, level) {
     var box = $('receive-list');
@@ -4140,7 +4243,9 @@
     // 覆盖式二级页（文件预览 / 我的分享 / 接收分享）：优先关闭
     if (!$('page-preview').classList.contains('hidden')) { closePreview(); return true; }
     if (!$('page-receive').classList.contains('hidden')) { hide($('page-receive')); return true; }
+    if (!$('page-directlink').classList.contains('hidden')) { hide($('page-directlink')); return true; }
     if (!$('page-shares').classList.contains('hidden')) { hide($('page-shares')); return true; }
+    if (!$('dl-result-modal').classList.contains('hidden')) { hide($('dl-result-modal')); return true; }
     // 优先关闭弹出的浮层/弹窗
     if (!$('confirm-modal').classList.contains('hidden')) { hide($('confirm-modal')); state.confirmOk = null; return true; }
     if (!$('move-picker').classList.contains('hidden')) { hide($('move-picker')); state.pickerState = null; return true; }
@@ -4325,11 +4430,47 @@
     if (mineShares) mineShares.addEventListener('click', openMyShares);
     var mineReceive = $('mine-receive');
     if (mineReceive) mineReceive.addEventListener('click', openReceiveShare);
+    var mineDirect = $('mine-directlink');
+    if (mineDirect) mineDirect.addEventListener('click', openDirectLink);
     // 覆盖页返回按钮
     var sharesBack = $('shares-back');
     if (sharesBack) sharesBack.addEventListener('click', function () { hide($('page-shares')); });
     var receiveBack = $('receive-back');
     if (receiveBack) receiveBack.addEventListener('click', function () { hide($('page-receive')); });
+    var dlBack = $('dl-back');
+    if (dlBack) dlBack.addEventListener('click', function () { hide($('page-directlink')); });
+    var dlOpen = $('dl-open');
+    if (dlOpen) dlOpen.addEventListener('click', doOpenDirectLink);
+    var dlLink = $('dl-link');
+    if (dlLink) dlLink.addEventListener('keydown', function (e) { if (e.key === 'Enter') doOpenDirectLink(); });
+    var dlCopy = $('dl-copy');
+    if (dlCopy) dlCopy.addEventListener('click', function () {
+      var u = $('dl-url-box') ? $('dl-url-box').textContent.trim() : '';
+      if (!u) { toast('无直链可复制'); return; }
+      copyText(u, '');
+      hide($('dl-result-modal'));
+      setTimeout(function () { toast('直链已复制到剪贴板'); }, 200);
+    });
+    var dlSaveQr = $('dl-save-qr');
+    if (dlSaveQr) dlSaveQr.addEventListener('click', function () {
+      var wrap = $('dl-qr-wrap');
+      if (!wrap || !wrap.dataset.qrUrl) { toast('无二维码'); return; }
+      var qrUrl = wrap.dataset.qrUrl;
+      var fname = 'qr_' + Date.now() + '.png';
+      if (bridge && bridge.downloadStream) {
+        try {
+          var gid = Number(bridge.downloadStream(qrUrl, fname, 0));
+          if (gid >= 0) toast('二维码已保存到下载目录');
+          else toast('保存失败');
+        } catch (e) { toast('保存失败: ' + e); }
+      } else if (bridge && bridge.download) {
+        try { bridge.download(qrUrl, fname); toast('二维码已保存'); } catch (e) { toast('保存失败'); }
+      } else {
+        var a = document.createElement('a');
+        a.href = qrUrl; a.download = fname; a.click();
+        toast('二维码已保存');
+      }
+    });
     // 预览页返回 / 复制链接
     var previewBack = $('pv-back');
     if (previewBack) previewBack.addEventListener('click', closePreview);

@@ -109,6 +109,7 @@
         <div class="mine-section-title">分享</div>
         <div class="mine-item mine-item-btn" id="mine-shares"><span class="mine-label"><span class="mi-icon" data-icon="share"></span>我的分享</span><span class="mine-arrow">›</span></div>
         <div class="mine-item mine-item-btn" id="mine-receive"><span class="mine-label"><span class="mi-icon" data-icon="link"></span>接收分享</span><span class="mine-arrow">›</span></div>
+        <div class="mine-item mine-item-btn" id="mine-directlink"><span class="mine-label"><span class="mi-icon" data-icon="link"></span>直链解析</span><span class="mine-arrow">›</span></div>
 
         <div class="mine-section-title">偏好设置</div>
         <div class="mine-item mine-item-btn" id="mine-theme"><span class="mine-label"><span class="mi-icon" data-icon="sun"></span>主题模式</span><span class="mine-val" id="theme-val">跟随系统</span><span class="mine-arrow">›</span></div>
@@ -275,6 +276,39 @@
   </div>
 </div>
 
+<!-- 直链解析页 -->
+<div id="page-directlink" class="page-cover hidden">
+  <div class="pc-head">
+    <span class="pc-back" id="dl-back">‹</span>
+    <span class="pc-title">直链解析</span>
+  </div>
+  <div class="pc-body">
+    <div class="rc-inputs">
+      <input id="dl-link" type="text" placeholder="粘贴123云盘分享链接或分享码" autocomplete="off">
+      <input id="dl-pwd" type="text" placeholder="提取码（如有）" autocomplete="off">
+      <button id="dl-open" class="btn-primary rc-open">解析文件列表</button>
+    </div>
+    <div class="rc-tip">解析后点击文件获取直链，直链有效期较短请尽快使用</div>
+    <div id="dl-list"></div>
+  </div>
+</div>
+
+<!-- 直链结果弹窗 -->
+<div id="dl-result-modal" class="modal hidden">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-title">直链地址</div>
+    <div class="dl-filename" id="dl-filename"></div>
+    <div class="dl-url-box" id="dl-url-box"></div>
+    <div class="dl-qr-wrap" id="dl-qr-wrap"></div>
+    <div class="modal-btns">
+      <button class="btn-plain" data-close>关闭</button>
+      <button id="dl-save-qr" class="btn-plain">保存二维码</button>
+      <button id="dl-copy" class="btn-primary">复制直链</button>
+    </div>
+  </div>
+</div>
+
 <!-- 文件预览页（图片 / 音视频 / 文本 / PDF / Word / Excel） -->
 <div id="page-preview" class="page-cover hidden">
   <div class="pc-head">
@@ -315,8 +349,12 @@
     <div class="sort-dir-row">
       <span>排序方向</span>
       <div class="sort-dir" id="sort-dir">
-        <button class="sd-btn" data-dir="asc">升序 ↑</button>
-        <button class="sd-btn" data-dir="desc">降序 ↓</button>
+        <button class="sd-btn" data-dir="asc">升序</button>
+        <button class="sd-btn" data-dir="desc">降序</button>
+      </div>
+    </div>
+  </div>
+</div>
       </div>
     </div>
     <div class="sheet-item cancel" data-close>关闭</div>
@@ -434,6 +472,7 @@
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
+<script src="qrcode.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -654,12 +654,12 @@ svg { display: block; }
 }
 #top-sort svg { width: 20px; height: 20px; }
 #top-sort:active { background: var(--hover); }
-.sort-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.sort-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
 .sort-opt {
-  display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 18px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 14px; color: var(--fg2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); font-size: 14px; color: var(--fg2); cursor: pointer; position: relative;
 }
-.sort-opt.active { background: var(--accent-bg); border-color: var(--accent-bg); color: var(--accent); font-weight: 600; }
-.sort-opt.active::after { content: '✓'; font-size: 13px; }
+.sort-opt.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sort-opt.active::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; }
 .sort-dir-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; color: var(--fg2); }
 .sort-dir { display: flex; gap: 8px; }
 .sd-btn {
@@ -808,3 +808,19 @@ svg { display: block; }
 .pv-html-wrap { flex: 1; overflow: hidden; }
 .pv-html-wrap iframe { width: 100%; height: 100%; border: none; background: #fff; }
 .load-more { text-align: center; padding: 16px; color: var(--fg3); font-size: 13px; }
+/* 大图标视图 */
+#file-list.grid-view { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px; padding: 8px; background: var(--card); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+#file-list.grid-view .file-card { display: flex; flex-direction: column !important; align-items: center !important; text-align: center; padding: 14px 4px; border-bottom: none; border-radius: 10px; width: auto !important; }
+#file-list.grid-view .file-card:active { background: var(--hover); }
+#file-list.grid-view .file-icon-wrap { width: 56px; height: 56px; margin: 0 0 8px 0; border-radius: 12px; }
+#file-list.grid-view .file-icon-wrap .file-icon { width: 28px; height: 28px; }
+#file-list.grid-view .file-body { width: 100%; }
+#file-list.grid-view .file-name { font-size: 11px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+#file-list.grid-view .file-meta { display: none; }
+/* 直链解析 */
+.dl-filename { font-size: 14px; color: var(--fg); margin: 8px 0; word-break: break-all; }
+.dl-url-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 12px; color: var(--accent); word-break: break-all; max-height: 120px; overflow-y: auto; margin-bottom: 10px; }
+.dl-qr-wrap { display: flex; justify-content: center; margin: 10px 0; }
+.dl-qr-wrap canvas, .dl-qr-wrap img { width: 180px; height: 180px; }
+#dl-list .rc-row { cursor: pointer; }
+
